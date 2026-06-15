@@ -1,0 +1,32 @@
+{
+  "name": "pi-etc",
+  "version": "0.1.0",
+  "description": "Personal pi coding agent extensions, skills, and themes",
+  "keywords": ["pi-package", "pi-extension", "pi-skill"],
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./extensions/**/*.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "themes": [
+      "./themes"
+    ]
+  },
+  "author": "e41q",
+  "license": "ISC",
+  "dependencies": {
+    "diff": "^5.2.0",
+    "nano-staged": "^1.0.2"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
