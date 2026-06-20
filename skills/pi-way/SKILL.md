@@ -18,7 +18,7 @@ Inspiration: [Mario Zechner's blog](https://mariozechner.at/posts/2025-11-30-pi-
 1. **Context is precious** — Progressive disclosure: load details only on demand. Don't dump.
 2. **Observability** — Write plans, todos, tracking to files. User sees everything. Nothing hidden.
 3. **Bash is the universal tool** — CLI tools, scripts. README-driven discovery: read the README before using a tool.
-4. **YOLO by default** — No permission prompts. Full filesystem access.
+4. **Autonomous execution by default** — No permission prompts. Full filesystem access.
 
 ---
 
@@ -43,20 +43,7 @@ Pi has no built-in sub-agents. Two paths, **choose by whether you need to steer*
 
 `pisub` wraps `pi --mode rpc` — a real JSONL protocol with `prompt`, `steer`, `follow_up`, `abort`. Works for **both** one-shot and long-running work:
 
-```bash
-# One-shot (fire-and-forget)
-pisub run reviewer "review src/auth/" --model zai/glm-5.2 --cwd ~/dev/proj
-# = spawn + send + wait + report + kill
-
-# Long-running / steerable
-pisub spawn researcher --model deepseek/deepseek-v4-flash --cwd ~/dev/proj --tools read,bash
-pisub send    researcher "Summarize src/auth/."
-pisub steer   researcher "Focus only on the OAuth flow."   # mid-flight!
-pisub tail    researcher                                 # live event stream
-pisub kill    researcher
-```
-
-See the **`pisub` skill** for the full command reference and patterns.
+See the **`pisub` skill** for commands and patterns. Quick reference: `pisub run <name> "task"` for one-shot, `pisub spawn` + `pisub steer` for interactive.
 
 ### Option B: `Agent` tool (@tintinweb/pi-subagents)
 
@@ -69,11 +56,7 @@ Agent({ subagent_type: "rust-coder", description: "Fix auth bug", prompt: "...",
 
 Use when: you want inline results, the Agent extension is available, and you don't need a durable log or mid-flight steering. For everything else, `pisub`.
 
-### ⚠️ NEVER spawn `pi -p` in tmux expecting to steer it
-
-`pi -p` (print mode) is one-shot: it prints and dies. You cannot steer it. `tmux capture-pane` reads a dead screen; `send-keys` into a closed window does nothing. This is the trap that makes "spawn pi via tmux" feel broken. For one-shot delegation use `pisub run` (or `pi -p` directly in the foreground — that's fine, just don't expect to steer it). For interactive sub-agents, use `pisub spawn`.
-
-### Creating one-shot agent types
+#### Creating one-shot agent types
 
 Write a `.md` file in `~/.pi/agent/agents/`:
 
@@ -87,7 +70,11 @@ tools: read, write, edit, bash
 You are a [role]. Your job is to [specific task].
 ```
 
-**Models**: `deepseek-v4-flash` for routine, `deepseek-v4-pro` for complex. Reserve expensive models for your main session.
+**Models**: `deepseek/deepseek-v4-flash` for routine, `deepseek/deepseek-v4-pro` for complex. Reserve expensive models for your main session.
+
+### ⚠️ NEVER spawn `pi -p` in tmux expecting to steer it
+
+`pi -p` (print mode) is one-shot: it prints and dies. You cannot steer it. `tmux capture-pane` reads a dead screen; `send-keys` into a closed window does nothing. This is the trap that makes "spawn pi via tmux" feel broken. For one-shot delegation use `pisub run` (or `pi -p` directly in the foreground — that's fine, just don't expect to steer it). For interactive sub-agents, use `pisub spawn`.
 
 ### When to delegate
 

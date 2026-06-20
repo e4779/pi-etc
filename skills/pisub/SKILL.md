@@ -1,6 +1,6 @@
 ---
 name: pisub
-description: "Spawn and steer pi agents via tmux + RPC mode. Commands: spawn, send (--steer/--follow-up), prompt, steer, follow-up, abort, bash, status, list, events (--follow), log, tail, kill, attach, help. Use when you need parallel agents, long-running sub-agents, or mid-flight steering."
+description: "Spawn and steer pi agents via tmux + RPC mode. Use when you need parallel agents, long-running sub-agents, or mid-flight steering."
 ---
 
 # pisub — sub-agents the pi way
@@ -257,4 +257,4 @@ Profiles compose like any Unix tool: source one from another for a shared base, 
 
 - [pi RPC mode docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc.md) — the protocol pisub wraps
 - [Mario Zechner: "No sub-agents"](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/) — the philosophy
-- [`pi-session` skill](./../skills/pi-session/SKILL.md) — inspect pi session JSONL files (works on pisub logs too, same format family)
+- [`pi-session` skill](../pi-session/SKILL.md) — inspect pi session JSONL files (works on pisub logs too, same format family)
