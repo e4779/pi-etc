@@ -47,6 +47,7 @@ chrome-devtools/
 ├── SKILL.md              # always-on: when to use + top tools + workflow (~1.5k tokens)
 ├── README.md             # this file (for humans)
 └── references/
+    ├── setup.md          # first-run setup guide (load on demand)
     ├── tools.md          # full catalog of all tools (load on demand)
     └── recipes.md        # worked end-to-end scenarios (load on demand)
 ```

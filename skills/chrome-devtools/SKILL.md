@@ -12,16 +12,24 @@ the few calls + workflows you actually need.
 
 ## Prerequisites
 
-1. **`mcporter` CLI** on PATH — check with `which mcporter`.
-2. **`chrome-devtools` server configured** in `~/.mcporter/mcporter.json`.
-3. **Daemon running** (chrome-devtools is stateful — daemon keeps Chrome alive):
-   ```bash
-   mcporter daemon status     # check
-   mcporter daemon start      # start if idle/missing
-   ```
+You need four things: `mcporter` CLI, a Chrome/Chromium binary, a
+`chrome-devtools` entry in `~/.mcporter/mcporter.json`, and a running daemon.
 
-If calls fail with `Connection closed` or `appears offline`, the tab crashed —
-**restart the daemon** and retry:
+**Quick check** — if this prints a page list, you're done:
+```bash
+mcporter daemon status
+mcporter call chrome-devtools.list_pages --output text
+```
+
+If anything is missing or broken, follow the **first-run setup guide**:
+```
+read skills/chrome-devtools/references/setup.md
+```
+It walks through inventory → repair → smoke test (cross-platform Linux/macOS/Windows,
+idempotent, same pattern as the `doctor` skill).
+
+If everything was green and calls suddenly fail with `Connection closed` or
+`appears offline`, the tab crashed — **restart the daemon** and retry:
 ```bash
 mcporter daemon restart && sleep 3
 ```
@@ -146,6 +154,7 @@ mcporter call chrome-devtools.resize_page width=1280 height=720
 
 This file covers the common 90%. For the rest, **read on demand**:
 
+- **First-run setup** (mcporter/Chrome/config/daemon not in place) → `read skills/chrome-devtools/references/setup.md`
 - **All 29 tools with full signatures** → `read skills/chrome-devtools/references/tools.md`
   (console messages, network requests, performance traces, heap snapshots, emulation, drag, upload, dialogs)
 - **Cookbook workflows** (table scraping, lazy-load, login, SPA debug, perf trace — drawn from real scraping sessions) → `read skills/chrome-devtools/references/recipes.md`
