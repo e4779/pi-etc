@@ -109,21 +109,29 @@ mcporter call chrome-devtools.evaluate_script function='() => {
 
 > *Real use: infinite-scroll lists on dohod.ru / MOEX history.*
 
-Many pages load rows as you scroll. Scroll, wait, re-measure:
+Many pages load rows as you scroll. Scroll with `press_key` (fires real scroll
+events; JS `scrollTo` can be detected-and-blocked by some SPAs), wait, re-measure:
 ```bash
-# 1. Scroll to the bottom
-mcporter call chrome-devtools.evaluate_script function='() => {
-  window.scrollTo(0, document.body.scrollHeight);
-  return "scrolled to " + document.body.scrollHeight;
-}'
+# 1. Scroll down — End jumps to bottom, PageDown steps. Use what fits the page.
+mcporter call chrome-devtools.press_key key=End
 
 # 2. Wait for the fetch to land
 sleep 1
 
-# 3. Re-count; repeat until the count stops growing
+# 3. Re-count; repeat until the count stops growing (reading is a legit evaluate use)
 mcporter call chrome-devtools.evaluate_script function='() => document.querySelectorAll(".item").length'
 ```
-For a "load more" button variant, see Recipe 5 (batch clicks in one evaluate).
+
+For a **"Load more" button** — click the button by `uid` (not via JS), then wait:
+```bash
+mcporter call chrome-devtools.take_snapshot          # find the button uid
+mcporter call chrome-devtools.click uid=1_9
+mcporter call chrome-devtools.wait_for --args '{"text":["Loading","More","End of list"]}'
+```
+For a batch of identical "load more" buttons, loop with `click` (each by uid) —
+not a single `evaluate_script` that calls `.click()` in a loop. The dedicated
+`click` fires real trusted events that SPAs listen for; synthetic clicks via
+`evaluate_script` silently fail on frameworks that check `event.isTrusted`.
 
 ---
 

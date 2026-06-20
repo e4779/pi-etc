@@ -184,9 +184,14 @@ Record a video of the tab. Exotic; check `mcporter list` for current params.
 
 ---
 
-## Evaluation — the swiss-army knife
+## Evaluation — for *reading* page state
 
 ### `evaluate_script` — run JS in the page, return JSON
+
+> **Scope:** use `evaluate_script` to **read** DOM/styles/text/tables/cookies.
+> For **actions** (click, fill, scroll, hover) use the dedicated tools — they
+> fire real trusted events and return a snapshot. See SKILL.md → "Use the
+> semantic tool".
 ```bash
 # No args
 mcporter call chrome-devtools.evaluate_script function='() => document.title'

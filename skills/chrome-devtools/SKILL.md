@@ -74,6 +74,24 @@ list_pages → select_page → navigate_page → take_snapshot → (act) → ver
 3. After any action, either pass `includeSnapshot=true` (click/fill return a fresh snapshot)
    or call `take_snapshot` again — uids change when the DOM changes.
 
+### ⚠️ Use the semantic tool, not `evaluate_script`
+
+`evaluate_script` is a swiss-army knife for **reading** state (DOM, styles, text,
+tables). For **actions** — clicking, filling, scrolling, hovering — it is the
+*wrong* tool: slower (no `includeSnapshot`), brittle (skips real event
+listeners), and harder to debug. Reach for it only when a dedicated tool doesn't
+exist.
+
+| Want to… | ❌ Don't | ✅ Do |
+|---|---|---|
+| Click a button/link | `el.click()` in evaluate_script | `click uid=1_5` |
+| Type into a field | `el.value = 'x'` | `fill uid=1_7 value=x` |
+| Fill a form | multiple `fill`s | `fill_form --args '{"elements":[...]}'` |
+| Scroll the page | `window.scrollTo(...)` | `press_key key=End` (or `PageDown`) |
+| Submit a form | `form.submit()` | `click` the submit button (or `press_key key=Enter`) |
+| Hover for a tooltip/menu | `dispatchEvent(new MouseEvent(...))` | `hover uid=1_3` |
+| Read N items / styles / text | — | **`evaluate_script` is correct here** |
+
 ## Top tools (covers ~90% of tasks)
 
 All calls use `mcporter call chrome-devtools.<tool> key=value ...`.
@@ -166,6 +184,8 @@ Don't load these unless the task actually needs them — that's the whole point.
 - ❌ `take_screenshot` to read text/DOM → use `take_snapshot` (cheaper, precise)
 - ❌ Multiple `fill` calls for one form → use `fill_form` (one round-trip)
 - ❌ Guessing selectors when you have `uid` → snapshot first, use the uid
+- ❌ **`evaluate_script` for actions** (`.click()`, `.value=`, `scrollTo`) →
+  use `click` / `fill` / `press_key` — they fire real events and return a snapshot
 - ❌ Writing a fresh `evaluate_script` for colors/box-model → see `chrome-css` skill for ready patterns
 - ❌ Calling tools when daemon is down → check `mcporter daemon status` first
 
