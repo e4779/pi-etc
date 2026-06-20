@@ -52,7 +52,7 @@
  */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync, statSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync, statSync, rmSync, createReadStream } from "node:fs";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 import * as readline from "node:readline";
@@ -140,7 +140,9 @@ function appendStdin(name: string, cmd: unknown) {
   appendJsonl(agentStdinPath(name), { ts: new Date().toISOString(), cmd });
 }
 
-/** Read a JSONL file into an array, tolerating trailing partial lines. */
+/** Read a JSONL file into an array, tolerating trailing partial lines.
+ * WARNING: For SMALL files only (e.g. registry.json). Use streamJsonl for
+ * large logs to avoid OOM. */
 function readJsonl(path: string): any[] {
   if (!existsSync(path)) return [];
   const out: any[] = [];
@@ -151,6 +153,53 @@ function readJsonl(path: string): any[] {
     try { out.push(JSON.parse(t)); } catch { /* skip partial */ }
   }
   return out;
+}
+
+/** Stream a JSONL file line-by-line, calling onEvent for each valid JSON line.
+ * Memory O(1) regardless of file size. Returns byte offset after last read.
+ * Non-existent file: returns 0.
+ */
+async function streamJsonl(
+  path: string,
+  onEvent: (evt: any) => void,
+  options: { sinceBytes?: number } = {},
+): Promise<number> {
+  if (!existsSync(path)) return 0;
+
+  const bytesConsumed = options.sinceBytes ?? 0;
+
+  const stream = createReadStream(path, { start: bytesConsumed });
+
+  return new Promise((resolve, reject) => {
+    const rl = readline.createInterface({
+      input: stream,
+      crlfDelay: Infinity,
+    });
+
+    rl.on("line", (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      try {
+        onEvent(JSON.parse(trimmed));
+      } catch {
+        /* skip partial/incomplete lines */
+      }
+    });
+
+    rl.on("close", () => {
+      // Resolve with the current file size as the byte offset past the last byte read.
+      // This is the position the next createReadStream({ start }) call should use.
+      resolve(statSync(path).size);
+    });
+
+    stream.on("error", (err) => {
+      if ((err as any).code === "ENOENT") {
+        resolve(0);
+      } else {
+        reject(err);
+      }
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -797,26 +846,28 @@ async function cmdEvents(args: string[]) {
   const filterIdx = rest.indexOf("--filter");
   const filter = filterIdx >= 0 ? rest[filterIdx + 1] : undefined;
 
-  // Print historical events from the log first
   const log = agentLogPath(name);
-  const history = readJsonl(log);
-  let lastIdx = -1;
-  for (let i = 0; i < history.length; i++) {
-    const e = history[i];
-    if (filter && e.type !== filter) continue;
-    if (since && e.id === since) lastIdx = i;
-  }
-  const startFrom = lastIdx >= 0 ? lastIdx + 1 : 0;
-  for (let i = startFrom; i < history.length; i++) {
-    printEventLine(history[i]);
-  }
+  let foundSince = !since;
+
+  // Stream historical events from the log
+  await streamJsonl(log, (evt: any) => {
+    // Apply filter early to discard before printing
+    if (filter && evt.type !== filter) return;
+
+    // Handle --since: skip until we find the matching ID
+    if (!foundSince) {
+      if (since && evt.id === since) foundSince = true;
+      return;
+    }
+
+    printEventLine(evt);
+  });
 
   if (!follow) return;
+
   // Tail live events from the daemon
   try {
     await withDaemon(name, async (c) => {
-      // First, get size to know where we left off
-      const seen = history.length;
       c.onEvent((evt) => {
         if (filter && evt.type !== filter) return;
         printEventLine(evt);
@@ -843,10 +894,35 @@ async function cmdLog(args: string[]) {
   const i = rest.indexOf("--last");
   if (i >= 0 && rest[i+1]) n = parseInt(rest[i+1], 10);
   const log = agentLogPath(name);
-  const all = readJsonl(log);
-  const slice = all.slice(-n);
-  for (const e of slice) printEventLine(e);
-  if (all.length > n) console.log(`... (${all.length - n} earlier, see pisub events ${name})`);
+
+  // Use a bounded ring buffer to keep only the last N printable events
+  // (events with a non-null summary from summarizeEvent)
+  const ring: any[] = [];
+  let totalSeen = 0;
+
+  await streamJsonl(log, (evt: any) => {
+    // Check if this event has a printable summary before adding to ring
+    const summary = summarizeEvent(evt);
+    if (summary === null) return;  // Skip noisy events
+
+    totalSeen++;
+    if (ring.length < n) {
+      ring.push(evt);
+    } else {
+      // Ring is full: overwrite the oldest position
+      ring[(totalSeen - n - 1) % n] = evt;
+    }
+  });
+
+  // Reconstruct chronological order (oldest first).
+  // When the ring wraps, the oldest entry is at (totalSeen - n) % n.
+  const count = Math.min(n, totalSeen);
+  const startIdx = totalSeen < n ? 0 : (totalSeen - n) % n;
+  for (let j = 0; j < count; j++) {
+    printEventLine(ring[(startIdx + j) % n]);
+  }
+
+  if (totalSeen > n) console.log(`... (${totalSeen - n} earlier, see pisub events ${name})`);
 }
 
 async function cmdTail(args: string[]) {
@@ -901,18 +977,65 @@ async function cmdReport(args: string[]) {
   if (si >= 0 && rest[si + 1]) sinceTs = rest[si + 1];
 
   const log = agentLogPath(name);
-  let events = readJsonl(log);
-  if (sinceTs) events = events.filter((e) => (e.ts ?? "") > sinceTs);
 
-  const reports = extractAssistantReports(events);
-  if (reports.length === 0) {
+  // Stream and accumulate only assistant message_end events with bounded ring buffer
+  const ring: AssistantReport[] = [];
+  let totalSeen = 0;
+
+  await streamJsonl(log, (evt: any) => {
+    // Filter by --since TS
+    if (sinceTs && (evt.ts ?? "") <= sinceTs) return;
+
+    // Extract assistant reports (inline logic from extractAssistantReports)
+    if (evt.type === "message_end") {
+      const m = evt.message;
+      if (m && m.role === "assistant") {
+        const text: string[] = [];
+        const toolCalls: string[] = [];
+        for (const b of (m.content ?? [])) {
+          if (b.type === "text" && b.text) text.push(b.text);
+          else if (b.type === "toolCall" && b.name) toolCalls.push(b.name);
+        }
+        // Skip empty assistant turns
+        if (text.length > 0 || toolCalls.length > 0) {
+          const report: AssistantReport = {
+            ts: evt.ts ?? "",
+            text: text.join("\n\n"),
+            toolCalls,
+            stopReason: m.stopReason,
+          };
+          totalSeen++;
+          if (ring.length < n) {
+            ring.push(report);
+          } else {
+            // Ring is full: overwrite the oldest position
+            ring[(totalSeen - n - 1) % n] = report;
+          }
+        }
+      }
+    }
+  });
+
+  const count = Math.min(n, totalSeen);
+  if (count === 0) {
     console.error(`pisub: no assistant text found for '${name}' in ${log}`);
     process.exit(1);
   }
-  const slice = reports.slice(-n);
-  for (let i = 0; i < slice.length; i++) {
-    const r = slice[i];
-    const idx = reports.length - slice.length + i + 1;
+
+  // Reconstruct chronological order (oldest first).
+  // When the ring wraps, the oldest entry is at (totalSeen - n) % n.
+  const startIdx = totalSeen < n ? 0 : (totalSeen - n) % n;
+  const toPrint: AssistantReport[] = [];
+  for (let j = 0; j < count; j++) {
+    toPrint.push(ring[(startIdx + j) % n]);
+  }
+
+  // The absolute index (1-based among ALL assistant reports in the log)
+  const skipped = totalSeen > n ? totalSeen - n : 0;
+
+  for (let i = 0; i < toPrint.length; i++) {
+    const r = toPrint[i];
+    const idx = skipped + i + 1;
     if (n > 1) {
       const sep = i > 0 ? "\n" + "─".repeat(60) + "\n" : "";
       process.stdout.write(sep);
@@ -936,18 +1059,25 @@ async function cmdWait(args: string[]) {
   const ti = rest.indexOf("--timeout");
   if (ti >= 0 && rest[ti + 1]) timeoutSec = parseInt(rest[ti + 1], 10);
 
-  // Track the log position at wait start. We're done when a NEW agent_end
-  // appears after this position. This is race-free (unlike get_state polling,
-  // which can report idle in the gap between `send` accepting the prompt and
-  // the stream actually starting).
+  // Track the log position in BYTES at wait start. We're done when a NEW agent_end
+  // appears after this byte position. This is race-free and O(new bytes) per poll,
+  // not O(total log size). This prevents OOM on large logs.
   const log = agentLogPath(name);
-  const startLen = readJsonl(log).length;
+  const startBytes = existsSync(log) ? statSync(log).size : 0;
   const deadline = timeoutSec > 0 ? Date.now() + timeoutSec * 1000 : Infinity;
+  let currentBytes = startBytes;
+
   while (Date.now() < deadline) {
-    const events = readJsonl(log);
-    for (let i = startLen; i < events.length; i++) {
-      if (events[i].type === "agent_end") return;  // agent finished this run
-    }
+    let sawEnd = false;
+    const newBytes = await streamJsonl(log, (evt: any) => {
+      if (evt.type === "agent_end") sawEnd = true;
+    }, { sinceBytes: currentBytes });
+
+    if (sawEnd) return;  // agent finished this run
+
+    // Advance byte position for next poll
+    currentBytes = newBytes;
+
     // Sanity: is the daemon even alive? If not and no agent_end came, fail.
     try {
       await withDaemon(name, async (c) => c.send({ type: "ping" }, 5000));
