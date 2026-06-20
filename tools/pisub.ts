@@ -856,6 +856,163 @@ async function cmdTail(args: string[]) {
   await cmdEvents([name, "--follow"]);
 }
 
+// ---------------------------------------------------------------------------
+// report — print the agent's assistant text IN FULL (the whole point of
+// one-shot delegation). pisub log summarises events to ~100 chars; report
+// reconstructs the final assistant message(s) from the JSONL log.
+// ---------------------------------------------------------------------------
+
+interface AssistantReport {
+  ts: string;
+  text: string;          // concatenated text blocks
+  toolCalls: string[];   // tool names invoked this turn (for context)
+  stopReason?: string;
+}
+
+/** Extract human-readable assistant turns from the JSONL event log. */
+function extractAssistantReports(events: any[]): AssistantReport[] {
+  const reports: AssistantReport[] = [];
+  for (const e of events) {
+    if (e.type !== "message_end") continue;
+    const m = e.message;
+    if (!m || m.role !== "assistant") continue;
+    const text: string[] = [];
+    const toolCalls: string[] = [];
+    for (const b of (m.content ?? [])) {
+      if (b.type === "text" && b.text) text.push(b.text);
+      else if (b.type === "toolCall" && b.name) toolCalls.push(b.name);
+    }
+    // Skip empty assistant turns (e.g. aborted mid-thinking with no text/tool)
+    if (text.length === 0 && toolCalls.length === 0) continue;
+    reports.push({ ts: e.ts ?? "", text: text.join("\n\n"), toolCalls, stopReason: m.stopReason });
+  }
+  return reports;
+}
+
+async function cmdReport(args: string[]) {
+  // pisub report <name> [--last N] [--since TS]
+  const name = requireName(args, "report");
+  const rest = args.slice(1);
+  let n = 1;
+  let sinceTs: string | undefined;
+  const li = rest.indexOf("--last");
+  if (li >= 0 && rest[li + 1]) n = parseInt(rest[li + 1], 10);
+  const si = rest.indexOf("--since");
+  if (si >= 0 && rest[si + 1]) sinceTs = rest[si + 1];
+
+  const log = agentLogPath(name);
+  let events = readJsonl(log);
+  if (sinceTs) events = events.filter((e) => (e.ts ?? "") > sinceTs);
+
+  const reports = extractAssistantReports(events);
+  if (reports.length === 0) {
+    console.error(`pisub: no assistant text found for '${name}' in ${log}`);
+    process.exit(1);
+  }
+  const slice = reports.slice(-n);
+  for (let i = 0; i < slice.length; i++) {
+    const r = slice[i];
+    const idx = reports.length - slice.length + i + 1;
+    if (n > 1) {
+      const sep = i > 0 ? "\n" + "─".repeat(60) + "\n" : "";
+      process.stdout.write(sep);
+      process.stdout.write(`[#${idx}  ${r.ts.slice(11, 19)}${r.stopReason ? `  stop=${r.stopReason}` : ""}${r.toolCalls.length ? `  tools=${r.toolCalls.join(",")}` : ""}]\n`);
+    }
+    process.stdout.write(r.text);
+    if (!r.text.endsWith("\n")) process.stdout.write("\n");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// wait — block until the agent stops streaming (idle). The missing primitive
+// for `pisub send ... && pisub wait ... && pisub report ...`. Polls get_state
+// every 500ms via the daemon socket. Exit 0 on idle, 1 on timeout.
+// ---------------------------------------------------------------------------
+
+async function cmdWait(args: string[]) {
+  const name = requireName(args, "wait");
+  const rest = args.slice(1);
+  let timeoutSec = 0;  // 0 = forever
+  const ti = rest.indexOf("--timeout");
+  if (ti >= 0 && rest[ti + 1]) timeoutSec = parseInt(rest[ti + 1], 10);
+
+  // Track the log position at wait start. We're done when a NEW agent_end
+  // appears after this position. This is race-free (unlike get_state polling,
+  // which can report idle in the gap between `send` accepting the prompt and
+  // the stream actually starting).
+  const log = agentLogPath(name);
+  const startLen = readJsonl(log).length;
+  const deadline = timeoutSec > 0 ? Date.now() + timeoutSec * 1000 : Infinity;
+  while (Date.now() < deadline) {
+    const events = readJsonl(log);
+    for (let i = startLen; i < events.length; i++) {
+      if (events[i].type === "agent_end") return;  // agent finished this run
+    }
+    // Sanity: is the daemon even alive? If not and no agent_end came, fail.
+    try {
+      await withDaemon(name, async (c) => c.send({ type: "ping" }, 5000));
+    } catch (e: any) {
+      console.error(`pisub: wait aborted — daemon for '${name}' is gone with no agent_end`);
+      process.exit(1);
+    }
+    await sleep(500);
+  }
+  console.error(`pisub: wait timed out after ${timeoutSec}s`);
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// run — one-shot delegation: spawn + send + wait + report + kill.
+// Composes the existing commands. The point is: for a one-task delegation you
+// don't want to type four commands. Pisub stays dumb about roles; this is
+// pure sugar over the existing primitives.
+//
+// Note: even though `pisub run` is a convenience, the daemon it spawns is a
+// real long-lived pisub agent — you can `pisub attach` or `pisub tail` it from
+// another terminal while run blocks here.
+// ---------------------------------------------------------------------------
+
+async function cmdRun(args: string[]) {
+  // pisub run <name> "prompt" [--model M] [--provider P] [--cwd D] [--tools T]
+  //           [--thinking L] [--session] [--tmux] [--prompt-file F]
+  //           [--system-prompt-file F] [--timeout SEC] [--steer | --follow-up]
+  if (args.length < 2) die('usage: pisub run <name> "prompt" [spawn opts] [--timeout SEC]');
+  const name = args[0];
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) die(`invalid name '${name}'`);
+
+  // Split positional prompt from flags. The prompt is the first non-flag arg
+  // after the name; everything else is spawn opts (+ our own --timeout).
+  const rest = args.slice(1);
+  const positional: string[] = [];
+  const flags: string[] = [];
+  let timeoutSec = 0;
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === "--timeout") { timeoutSec = parseInt(rest[++i], 10); continue; }
+    if (a.startsWith("--")) { flags.push(a); if (i + 1 < rest.length && !rest[i + 1].startsWith("--")) flags.push(rest[++i]); }
+    else positional.push(a);
+  }
+  const prompt = positional.join(" ");
+  if (!prompt) die('missing prompt (positional arg after name)');
+
+  const reg = gcRegistry();
+  if (reg[name]) die(`agent '${name}' already running — use 'pisub send' instead of 'pisub run'`);
+
+  // spawn (writes its own status lines to stdout — fine)
+  await cmdSpawn([name, ...flags]);
+  try {
+    // send the prompt
+    await sendQueued(name, prompt, flags.includes("--steer"), flags.includes("--follow-up"));
+    // wait for idle (with optional timeout)
+    await cmdWait([name, ...(timeoutSec > 0 ? ["--timeout", String(timeoutSec)] : [])]);
+    // print the final report (full text, not truncated)
+    await cmdReport([name]);
+  } finally {
+    // always clean up — one-shot agents shouldn't linger
+    try { await cmdKill([name]); } catch {}
+  }
+}
+
 async function cmdKill(args: string[]) {
   if (args[0] === "--all") {
     const reg = gcRegistry();
@@ -943,10 +1100,18 @@ SEND MESSAGES
 OBSERVE
   pisub list                                all active agents
   pisub status [name]                       one-line summary
-  pisub log <name> [--last N]               last N events from the log
+  pisub log <name> [--last N]               last N events from the log (summarised)
+  pisub report <name> [--last N] [--since TS]   FULL assistant text (not truncated)
   pisub tail <name>                         live tail (Ctrl-C to stop)
   pisub events <name> [--follow] [--since ID] [--filter TYPE]
   pisub attach <name>                       tmux attach to live view
+
+ONE-SHOT DELEGATION
+  pisub wait <name> [--timeout SEC]         block until agent idle (exit 0/1)
+  pisub run <name> "prompt" [spawn opts] [--timeout SEC]
+          = spawn + send + wait + report + kill, in one call.
+          Use for fire-and-forget delegation. The agent still runs as a real
+          daemon meanwhile — 'pisub tail <name>' from another terminal works.
 
 CONTROL
   pisub kill <name>                         terminate agent
@@ -960,22 +1125,34 @@ FILES
   /tmp/pisub-<uid>/<name>.daemon.log        daemon stdout/stderr (tmux pane content)
 
 EXAMPLES
+  # Long-running, steerable
   pisub spawn researcher --model deepseek/deepseek-v4-flash --cwd ~/dev/proj
   pisub send researcher "summarize src/auth/"
   pisub send researcher "actually focus only on the login flow" --steer
   pisub tail researcher                     # watch it work
+
+  # One-shot delegation (the common case)
+  pisub run reviewer "review src/auth/ for bugs" --model zai/glm-5.2 --cwd ~/dev/proj
+  # or, explicit primitives:
+  pisub spawn rc1 --model deepseek/deepseek-v4-pro --cwd ~/dev/proj
+  pisub send rc1 "implement feature X"
+  pisub wait rc1 && pisub report rc1
+  pisub kill rc1
 
   # Two parallel agents
   pisub spawn rust-coder --model deepseek/deepseek-v4-pro --cwd ~/dev/proj
   pisub spawn reviewer  --model zai/glm-5.2 --cwd ~/dev/proj --tmux
   pisub send rust-coder "implement feature X"
   pisub send reviewer  "review the diff in src/" --follow-up
+  pisub wait rust-coder && pisub report rust-coder
   pisub list
 
 WHY NOT JUST 'pi -p'?
   'pi -p' is one-shot: prints and dies. You can't steer it.
   pisub keeps the agent alive via 'pi --mode rpc' and gives you a real
   protocol (prompt/steer/follow_up/abort) with full event logging.
+  For pure one-shot without steering, 'pisub run' is the direct equivalent
+  of 'pi -p' but with profiles, full event log, and a durable artifact.
 `);
 }
 
@@ -1046,6 +1223,9 @@ async function main() {
     case "events":      await cmdEvents(rest); break;
     case "log":         await cmdLog(rest); break;
     case "tail":        await cmdTail(rest); break;
+    case "report":      await cmdReport(rest); break;
+    case "wait":        await cmdWait(rest); break;
+    case "run":         await cmdRun(rest); break;
     case "kill":        await cmdKill(rest); break;
     case "attach":      await cmdAttach(rest); break;
     default:

@@ -54,9 +54,12 @@ pisub kill researcher
 | `pisub bash <name> "cmd"` | Run bash in agent context (output attached to next prompt) |
 | `pisub list` | All active agents (one-line each) |
 | `pisub status [name]` | Detailed status (with `name`: model, cwd, tokens, queue) |
-| `pisub log <name> [--last N]` | Read the JSONL event log |
+| `pisub log <name> [--last N]` | Read the JSONL event log (summarised, ~100 chars/event) |
+| `pisub report <name> [--last N] [--since TS]` | **FULL** assistant text (not truncated — use for results) |
 | `pisub tail <name>` | Live tail (Ctrl-C to stop) |
 | `pisub events <name> [--follow] [--filter TYPE]` | Event stream, filterable |
+| `pisub wait <name> [--timeout SEC]` | Block until agent idle (exit 0/1) — the missing primitive |
+| `pisub run <name> "prompt" [spawn opts] [--timeout SEC]` | **One-shot**: spawn+send+wait+report+kill in one call |
 | `pisub kill <name>` | Terminate one agent |
 | `pisub kill --all` | Terminate every agent + clean tmux |
 | `pisub attach <name>` | tmux attach to live view (requires `--tmux` at spawn) |
@@ -78,12 +81,36 @@ pisub spawn <name> [--model M] [--provider P] [--cwd DIR] [--tools T]
 
 | Need | Use |
 |------|-----|
-| One-shot research → artifact → fresh session | Mario's recommended flow: a separate `pi` session by hand, save to a file, reference it later. **Not pisub.** |
-| Code review of a diff | `pi -p "review this diff"` one-shot. **Not pisub.** |
-| Long-running agent you want to steer | **pisub.** |
+| One-shot delegation (fire-and-forget) | **`pisub run <name> "prompt"`** — spawn+send+wait+report+kill in one call. |
+| Long-running agent you want to steer | **pisub** (`spawn` + `send` + `steer`). |
 | 2+ agents working in parallel | **pisub** (spawn N, send to each, `pisub list` to watch). |
 | Agent that should react to your mid-task feedback | **pisub** with `steer`. |
 | Fully isolated context (fresh, no parent pollution) | **pisub** (always spawns fresh). |
+| `Agent` tool available and task is simple one-shot | Either works. `pisub run` gives you a durable JSONL log; `Agent` tool returns inline. |
+
+## One-shot delegation: `pisub run`
+
+For fire-and-forget tasks (the most common delegation pattern), use `run`. It composes the existing primitives:
+
+```bash
+pisub run reviewer "review src/auth/ for bugs" --model zai/glm-5.2 --cwd ~/dev/proj
+# = spawn + send + wait + report + kill, in one call
+```
+
+The daemon still runs as a real long-lived agent while `run` blocks — you can `pisub tail <name>` from another terminal to watch it work. `run` cleans up (kills) on exit, even on error.
+
+If you want to compose manually (e.g. to inspect intermediate state):
+
+```bash
+pisub spawn rc1 --model deepseek/deepseek-v4-pro --cwd ~/dev/proj
+pisub send rc1 "implement feature X"
+pisub wait rc1 && pisub report rc1
+pisub kill rc1
+```
+
+`pisub wait` is the missing primitive: it blocks until the agent emits `agent_end` (race-free, watches the log position — not get_state polling, which lies in the gap between `send` accepting a prompt and the stream starting).
+
+`pisub report` prints the **full** assistant text — unlike `pisub log` which summarises each event to ~100 chars. Use `report` when you want the actual answer; use `log` when you want the event timeline.
 
 ## Parallel agents pattern
 
@@ -144,6 +171,8 @@ pisub events dead-agent --filter message_update | toonq --from json
 - **Steering an idle agent:** `steer` queues for the *current* turn. If the agent is idle, use `send` (prompt) instead — `steer` on idle may hang in queue until the next prompt.
 - **`--tools` must include what the agent needs.** If you spawn with `--tools read` and ask it to write code, it fails. Default is safe (`read,write,edit,bash`).
 - **Strong roles need `--system-prompt-file`, not `--prompt-file`.** `--prompt-file` *appends* to pi's default system prompt ("You are an expert coding assistant...") — weaker models keep answering from the default identity and ignore the append. For tintinweb-style role agents use `--system-prompt-file` (full *replace*). Tools still work — they're provided separately from the system prompt.
+- **`response(get_state)` spam in `pisub log` is normal.** `pisub status`/`wait` poll the daemon's `get_state` to check streaming — each poll shows up as a `response(get_state)` line in the log. It is NOT the agent being stuck; it's pisub's own health check. Filter it out with `pisub log <name> | rg -v get_state` if it bothers you.
+- **`wait` is race-free because it watches log position, not get_state.** Earlier versions polled `get_state` and could return "idle" in the gap between `send` accepting a prompt and the stream starting. Now `wait` tracks the JSONL log and returns only when a new `agent_end` event appears.
 
 ## Profiles — reusable agents as shell scripts
 
