@@ -253,6 +253,8 @@ async function runDaemon(opts: {
   thinking?: string;
   saveSession?: boolean;
   tmux?: boolean;
+  promptFile?: string;
+  systemPromptFile?: string;
 }): Promise<void> {
   ensureDirs();
   const sockPath = socketPathFor(opts.name);
@@ -272,6 +274,27 @@ async function runDaemon(opts: {
     // remove --no-session
     const i = piArgs.indexOf("--no-session");
     if (i >= 0) piArgs.splice(i, 1);
+  }
+  // --prompt-file <path>: read file, inject as system-prompt append.
+  // --system-prompt-file <path>: read file, REPLACE the default system prompt.
+  // Pisub stays dumb about profiles — the .sh wrapper resolves the path
+  // (usually absolute via $(dirname "$0")) so we don't depend on daemon cwd.
+  // system-prompt-file takes precedence (replace + append is redundant).
+  if (opts.systemPromptFile) {
+    let text: string;
+    try { text = readFileSync(opts.systemPromptFile, "utf-8"); }
+    catch (e: any) { throw new Error(`--system-prompt-file: cannot read ${opts.systemPromptFile}: ${e.message}`); }
+    if (text.trim()) piArgs.push("--system-prompt", text);
+  } else if (opts.promptFile) {
+    let promptText: string;
+    try {
+      promptText = readFileSync(opts.promptFile, "utf-8");
+    } catch (e: any) {
+      throw new Error(`--prompt-file: cannot read ${opts.promptFile}: ${e.message}`);
+    }
+    if (promptText.trim()) {
+      piArgs.push("--append-system-prompt", promptText);
+    }
   }
 
   const pi = spawn("pi", piArgs, {
@@ -555,6 +578,16 @@ async function cmdSpawn(args: string[]) {
   const opts = parseOpts(args.slice(1));
   const cwd = opts.cwd ?? process.cwd();
   if (!existsSync(cwd)) die(`cwd does not exist: ${cwd}`);
+  // Resolve --prompt-file / --system-prompt-file to absolute now — the daemon
+  // may have a different cwd.
+  for (const key of ["promptFile", "systemPromptFile"] as const) {
+    const v = opts[key];
+    if (typeof v === "string") {
+      const resolved = resolvePathArg(v, process.cwd());
+      if (!existsSync(resolved)) die(`--${key === "promptFile" ? "prompt-file" : "system-prompt-file"} not found: ${resolved}`);
+      opts[key] = resolved;
+    }
+  }
   if (opts.model && !opts.provider) {
     // Try to split provider/model if user wrote "provider/model"
     const m = opts.model.match(/^([^/]+)\/(.+)$/);
@@ -640,6 +673,8 @@ async function cmdDaemon(args: string[]) {
     thinking: opts.thinking,
     saveSession: opts.session === true,
     tmux: opts.tmux === true,
+    promptFile: opts.promptFile,
+    systemPromptFile: opts.systemPromptFile,
   });
 }
 
@@ -882,10 +917,18 @@ function cmdHelp() {
 SPAWN
   pisub spawn <name> [--model M] [--provider P] [--cwd DIR] [--tools T]
                     [--thinking off|low|medium|high] [--session] [--tmux]
+                    [--prompt-file PATH] [--system-prompt-file PATH]
     Launches a 'pi --mode rpc' subprocess as a daemon.
     Default: --no-session (ephemeral), headless (no tmux).
     --tmux also creates 'pisub-<name>' tmux session for live view.
     Model can be 'provider/model' shorthand, e.g. 'zai/glm-5.2'.
+    --prompt-file PATH: file contents appended to the default system prompt.
+      Use for light additions (extra guidelines) — keeps pi's default identity.
+    --system-prompt-file PATH: file contents REPLACE pi's default system prompt.
+      Use for strong role/persona agents (tintinweb-style). Tools (read/write/
+      edit/bash) still work — they're provided separately from the system prompt.
+      system-prompt-file takes precedence over prompt-file.
+      Usually wrapped in a ~/.pisub/profiles/<name> script so you never type it.
 
 SEND MESSAGES
   pisub send <name> "msg"                   prompt (default)
@@ -965,6 +1008,14 @@ function die(msg: string): never {
 }
 function warn(msg: string) { console.error(`pisub: warning: ${msg}`); }
 function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
+/** Resolve a CLI path arg to absolute against a base cwd. */
+function resolvePathArg(p: string, baseCwd: string): string {
+  if (p.startsWith("/")) return p;
+  if (p.startsWith("~/")) return join(HOME, p.slice(2));
+  if (p === "~") return HOME;
+  return join(baseCwd, p);
+}
 
 // ---------------------------------------------------------------------------
 // main
