@@ -249,7 +249,7 @@ Profiles compose like any Unix tool: source one from another for a shared base, 
 
 ## NEVER do this
 
-- Do NOT spawn `pi -p` in tmux for interactive work. It's one-shot. Use pisub.
+- Do NOT spawn `pi -p` in tmux expecting to steer it later. `pi -p` is one-shot: it prints and exits — there is nothing to send to. For interactive/steerable agents use `pisub spawn`. For one-shot delegation use `pisub run`.
 - Do NOT `tmux send-keys` into a pisub agent. Use `pisub send` / `pisub steer` — that's the whole point.
 - Do NOT leave agents running across sessions. `pisub kill --all` before you finish.
 
