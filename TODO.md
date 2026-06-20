@@ -24,6 +24,7 @@ pi-etc/
 - [x] **pi-session** → `skills/pi-session/SKILL.md` + `tools/pi-session.ts`
 - [x] **pi-skill-deepthink** → `skills/deepthink/SKILL.md` + `bin/tot-*`
 - [x] **skill-layout-check** → `skills/layout-check/SKILL.md` + `skills/layout-check/scripts/layoutProbe.mjs`
+- [x] **chrome-devtools skill** → `skills/chrome-devtools/` (SKILL.md + references/tools.md + references/recipes.md). pi-way ответ на pi-mcporter: один компактный скилл вместо 18k токенов схем MCP. Рецепты основаны на реальных сессиях (invest-research: finam/MOEX/dohod).
 
 ## Финальная структура
 
@@ -59,7 +60,7 @@ pi-e4779/
 
 ## Отложено
 
-- pi-mcporter (слишком тяжёлый, много файлов, под вопросом)
+- pi-mcporter (слишком тяжёлый, много файлов, под вопросом) → решено иначе: вместо тяжёлого расширения сделан лёгкий скилл `chrome-devtools` (см. выше). Обёртывает `mcporter call chrome-devtools.*` через progressive disclosure.
 - pi-subagent (сложный, требует отдельного рассмотрения)
 - pi-agent-rouble-footer (маленький, можно добавить потом)
 - pi-gigachat-provider (специфичный провайдер)

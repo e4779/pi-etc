@@ -6,7 +6,7 @@
 ## Установка
 
 ```bash
-pi install git@gitverse.ru:e4779/pi-etc.git
+pi install git:git@gitverse.ru:e4779/pi-etc.git
 ```
 
 Или локально (для разработки):
@@ -21,9 +21,9 @@ pi install ~/dev/pi-etc -l
 
 | Расширение | Файл | Описание |
 |---|---|---|
-| **pi-way** | `pi-way.ts` | Инжектит принципы pi-way в системный промпт каждого сеанса |
-| **lint-check** | `lint-check.ts` | Запускает линтеры через nano-staged после каждого хода агента |
-| **qwen-flavor** | `qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
+| **pi-way** | `extensions/pi-way.ts` | Инжектит принципы pi-way в системный промпт каждого сеанса |
+| **lint-check** | `extensions/lint-check.ts` | Запускает линтеры через nano-staged после каждого хода агента |
+| **qwen-flavor** | `extensions/qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
 
 ### Скиллы (`skills/`)
 
@@ -33,6 +33,7 @@ pi install ~/dev/pi-etc -l
 | **pi-session** | `/skill:pi-session` | Парсинг и инспекция JSONL-сессий pi агента |
 | **deepthink** | `/skill:deepthink` | Tree-of-Thoughts для сложных решений |
 | **layout-check** | `/skill:layout-check` | Верификация CSS-вёрстки через Chrome DevTools |
+| **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP (без раздувания контекста на 18k токенов) |
 
 ### Утилиты (`tools/`, `bin/`)
 
@@ -167,9 +168,12 @@ pi-etc/
 │   ├── pi-way/SKILL.md
 │   ├── pi-session/SKILL.md
 │   ├── deepthink/SKILL.md
-│   └── layout-check/
+│   ├── layout-check/        
+│   │   ├── SKILL.md
+│   │   └── scripts/layoutProbe.mjs
+│   └── chrome-devtools/
 │       ├── SKILL.md
-│       └── scripts/layoutProbe.mjs
+│       └── references/       # tools.md + recipes.md — грузятся по требованию
 ├── tools/                # CLI-утилиты
 │   └── pi-session.ts
 ├── bin/                  # Shell-скрипты
