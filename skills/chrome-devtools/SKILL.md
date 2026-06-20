@@ -1,6 +1,14 @@
 ---
 name: chrome-devtools
-description: Drive a real Chrome tab via the chrome-devtools MCP. Use when the user asks to scrape a website, test a frontend, click buttons, fill out or submit forms, log in, debug console errors, inspect network requests, take page screenshots, or measure page performance. Workflow: navigate, take a11y snapshots (every element gets a uid), click/fill/hover via uid, evaluate JS, read console & network, capture screenshots, run performance traces. Wraps `mcporter call chrome-devtools.*` so the 29-tool schema (~18k tokens) stays out of context until needed.
+description: >
+  Drive a real Chrome tab via the chrome-devtools MCP. Use when the user asks
+  to scrape a website, test a frontend, click buttons, fill out or submit
+  forms, log in, debug console errors, inspect network requests, take page
+  screenshots, or measure page performance. Workflow: navigate, take a11y
+  snapshots (every element gets a uid), click/fill/hover via uid, evaluate
+  JS, read console & network, capture screenshots, run performance traces.
+  Wraps `mcporter call chrome-devtools.*` so the 29-tool schema (~18k tokens)
+  stays out of context until needed.
 allowed-tools: bash read
 ---
 
