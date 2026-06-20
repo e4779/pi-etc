@@ -179,8 +179,10 @@ Don't loop blindly. Diagnose by symptom:
 | `mcporter: command not found` | 3a didn't take | re-run `npm i -g mcporter`, check `npm root -g` is on PATH |
 | `Cannot find module ... chrome-devtools-mcp` | npx cache corrupt | `rm -rf ~/.npm/_npx && npm cache clean --force`, retry |
 | `Target closed` / Chrome won't launch | wrong `--executablePath`, or Chrome already running and locking the profile | close all Chrome windows; remove `--executablePath` to auto-detect; or switch to `--browserUrl` |
-| `Connection closed` right after start | tab crashed on a heavy profile | restart daemon; use a dedicated `--userDataDir`; see frozen-tabs note in `SKILL.md` |
+| `Connection closed` right after start | tab crashed, often OOM (chrome-devtools-mcp forces every open tab to load) | restart daemon; close unneeded tabs; use a dedicated Chrome via `--browserUrl` or a separate `--userDataDir` |
 | `Navigation timeout` on `list_pages` | Chrome cold start | retry the call once |
+| `MCP error -32001: Request timed out` | slow page or hung tab | retry; persistent → `mcporter daemon restart && sleep 3` |
+| `Navigation timeout of 10000 ms exceeded` (real nav) | slow site | retry `navigate_page`; or raise `timeout=` |
 | daemon says `connected` but calls hang | stale daemon from before config change | `mcporter daemon restart && sleep 3` |
 
 Once green, this file is done — return to `SKILL.md` for the actual workflow.

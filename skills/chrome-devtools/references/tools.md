@@ -19,11 +19,25 @@ mcporter list chrome-devtools --schema    # full params (large output)
 ```
 
 If a tool below is missing, either upgrade (`chrome-devtools-mcp@latest`) or
-enable its flag in `~/.mcporter/mcporter.json` (see `../SKILL.md` → "Tuning the
-tool surface"). If a tool exists on your box but isn't listed here, trust
+enable its flag in `~/.mcporter/mcporter.json` (see [Tuning the tool
+surface](#tuning-the-tool-surface-server-flags) below). If a tool exists on your box but isn't listed here, trust
 `mcporter list` — this doc may lag behind upstream.
 
 All calls: `mcporter call chrome-devtools.<tool> key=value ...`
+
+---
+
+## Tuning the tool surface (server flags)
+
+The MCP ships more tools than most tasks need. Trim it in `~/.mcporter/mcporter.json`
+(then `mcporter daemon restart`):
+
+- **`--slim`** — radical: just 3 tools (`navigate`, `evaluate`, `screenshot`). Best for pure scraping.
+- **`--no-category-network` / `--no-category-performance` / `--no-category-emulation`** — granular: drop whole categories you don't use, keep the rest.
+- **`--screenshotFormat jpeg --screenshotMaxWidth 1280`** — smaller screenshots = less context.
+- **`--experimentalVision`** — enables `click_at(x, y)` (coordinate clicks, no uid needed; needs a vision-capable model).
+
+Confirm what's live with `mcporter list chrome-devtools --brief`.
 
 ---
 
