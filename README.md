@@ -34,6 +34,7 @@ pi install ~/dev/pi-etc -l
 | **deepthink** | `/skill:deepthink` | Tree-of-Thoughts для сложных решений |
 | **layout-check** | `/skill:layout-check` | Верификация CSS-вёрстки через Chrome DevTools |
 | **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP (без раздувания контекста на 18k токенов) |
+| **zai-mcp** | `/skill:zai-mcp` | Веб-поиск, страница→markdown, семантическое чтение GitHub-репо, OCR/анализ изображений и видео через 4 Z.AI MCP сервера |
 
 ### Утилиты (`tools/`, `bin/`)
 
@@ -174,6 +175,9 @@ pi-etc/
 │   └── chrome-devtools/
 │       ├── SKILL.md
 │       └── references/       # tools.md + recipes.md — грузятся по требованию
+├── zai-mcp/
+│   ├── SKILL.md
+│   └── references/           # tools.md (13 tools) + recipes.md (7 сценариев)
 ├── tools/                # CLI-утилиты
 │   └── pi-session.ts
 ├── bin/                  # Shell-скрипты
