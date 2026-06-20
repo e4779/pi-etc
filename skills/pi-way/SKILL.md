@@ -27,29 +27,48 @@ Inspiration: [Mario Zechner's blog](https://mariozechner.at/posts/2025-11-30-pi-
 You have more than just read/write/edit/bash. Before you start working, understand what's available:
 
 - **`mcporter`** — MCP servers behind progressive disclosure. ALWAYS search → describe → call. Never call without describing the schema first. Explore all available servers.
-- **`Agent`** — Spawn specialized sub-agents (@tintinweb/pi-subagents). Explore available agent types.
+- **`Agent`** — One-shot sub-agent delegation (@tintinweb/pi-subagents). Use for fire-and-forget tasks where you want a result back.
+- **`pisub`** — Live, steerable sub-agents via tmux + RPC. Use for long-running, parallel, or interactive work. Read the `pisub` skill before first use.
 - **Extension tools** — mcporter bridge, powershell utilities, and others. They're in your tool list — read their descriptions.
 
 **Rule**: before using any mcporter tool for the first time, call `describe` to get its schema.
 
 ---
 
-## Sub-Agents
+## Sub-Agents — pick by interactivity
 
-Pi has no built-in sub-agents — extensions fill this gap. Use the **`Agent` tool** (@tintinweb/pi-subagents).
+Pi has no built-in sub-agents. Two paths, **choose by whether you need to steer**:
 
-### Basic usage
+### One-shot delegation → `Agent` tool
+
+Use when you want a result back and don't need to interact mid-task. The `Agent` tool (@tintinweb/pi-subagents) spawns a fresh sub-agent, runs it, returns the result.
 
 ```json
-Agent({ subagent_type: "rust-coder", description: "Fix auth bug", prompt: "..." })
-Agent({ subagent_type: "Explore", description: "Find auth files", prompt: "...", run_in_background: true })
-Agent({ subagent_type: "researcher", prompt: "...", inherit_context: true })
-Agent({ subagent_type: "researcher", prompt: "...", schedule: "0 0 9 * * 1" })
+Agent({ subagent_type: "Explore", description: "Find auth files", prompt: "..." })
+Agent({ subagent_type: "rust-coder", description: "Fix auth bug", prompt: "...", run_in_background: true })
 ```
 
-**Modes**: `spawn` (clean context, default) or `fork` (inherit parent). **Background**: `run_in_background: true`. **Steering**: `steer_subagent` mid-run.
+Good for: code review, exploration, research → artifact, any "do X and tell me" task.
 
-### Creating agents
+### Long-running / parallel / steerable → `pisub`
+
+Use when the agent should run for a while, you want to watch it, or you need to redirect it mid-flight. `pisub` wraps `pi --mode rpc` — a real JSONL protocol with `prompt`, `steer`, `follow_up`, `abort`.
+
+```bash
+pisub spawn researcher --model deepseek/deepseek-v4-flash --cwd ~/dev/proj --tools read,bash
+pisub send    researcher "Summarize src/auth/."
+pisub steer   researcher "Focus only on the OAuth flow."   # mid-flight!
+pisub tail    researcher                                 # live event stream
+pisub kill    researcher
+```
+
+See the **`pisub` skill** for the full command reference and patterns.
+
+### ⚠️ NEVER spawn `pi -p` in tmux for interactive work
+
+`pi -p` (print mode) is one-shot: it prints and dies. You cannot steer it. `tmux capture-pane` reads a dead screen; `send-keys` into a closed window does nothing. This is the trap that makes "spawn pi via tmux" feel broken. For interactive sub-agents, use `pisub` (which wraps `pi --mode rpc`, not `pi -p`).
+
+### Creating one-shot agent types
 
 Write a `.md` file in `~/.pi/agent/agents/`:
 
@@ -67,11 +86,12 @@ You are a [role]. Your job is to [specific task].
 
 ### When to delegate
 
-- **Code generation** → rust-coder, script-kiddie
-- **Research** → researcher (MCP, web, API docs)
-- **Exploration** → Explore (fast codebase search)
-- **Wiki work** → wiki-maintainer
-- **Parallel** → multiple agents on independent tasks
+- **Code generation (one-shot)** → `Agent` rust-coder, script-kiddie
+- **Research → artifact** → `Agent` researcher, then start a fresh session with the artifact
+- **Exploration** → `Agent` Explore (fast codebase search)
+- **Long-running worker you want to watch** → `pisub`
+- **Parallel agents on independent tasks** → `pisub` (spawn N, `pisub list` to watch)
+- **Agent you need to redirect mid-task** → `pisub` with `steer`
 - **Review loop** → worker implements → reviewer checks with fresh context → fix → repeat (max 3)
 
 ---
@@ -177,7 +197,8 @@ Experiments, parallel explorations, review→fix — all isolated via filesystem
 
 | Need | Pi Way |
 |------|--------|
-| Sub-agent | `Agent` tool + agent `.md` files |
+| One-shot sub-agent | `Agent` tool + agent `.md` files |
+| Steerable / parallel / long-running sub-agent | `pisub` (tmux + RPC) |
 | Orchestration | Make — data flows through recipes (lenses) |
 | External tool | mcporter (describe first!), CLI + README |
 | Planning | `PLAN.md` |
@@ -193,3 +214,4 @@ Experiments, parallel explorations, review→fix — all isolated via filesystem
 - [Armin Ronacher: Pi within OpenClaw](https://lucumr.pocoo.org/2026/1/31/pi/)
 - [tintinweb/pi-subagents](https://github.com/tintinweb/pi-subagents)
 - [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents)
+- [`pisub` skill](./../pisub/SKILL.md) — live sub-agents via tmux + RPC
