@@ -40,6 +40,9 @@ mcporter list zai-vision  --brief   # → 8 tools (analyze_image, ...)
 - "Read this GitHub repo" semantically without cloning → `zai-zread`
 - OCR a screenshot, read a chart/diagram, analyze an image or video, diff two UI
   screenshots → `zai-vision`
+- **Verify a rendered HTML/chart looks right** → the chrome-devtools → zai-vision
+  loop (Recipe 8): screenshot the live page, ask vision to check it. Catches
+  bugs code review misses.
 
 **Don't** use it for local files — `read` them. Don't use it for live JS pages
 needing clicks/login — that's `chrome-devtools`.

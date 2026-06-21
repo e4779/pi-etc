@@ -178,7 +178,64 @@ model), `spec` (implementation spec), `description` (prose description).
 
 ---
 
+## Recipe 8 — Render verification loop (chrome-devtools → zai-vision)
+
+> *You rendered an HTML report / dashboard / chart and want to verify it
+> looks right — without eyeballing the pixels yourself (or when your model
+> can't see images). The two skills compose: chrome-devtools captures,
+> zai-vision judges.*
+
+This catches bugs that code review misses. Real catch: a Chart.js chart used a
+`category` X-axis where `linear` was needed → the axis showed `0–9` instead of
+`5–50%`, and annotation plugins silently never fired. The code *looked* correct;
+the screenshot + vision analysis proved it wasn't.
+
+```bash
+# 1. rebuild the artifact (mk/cargo/whatever your pipeline uses)
+mk reports/dashboard.html
+
+# 2. force a FRESH load — append a cache-buster query param each iteration
+#    so chrome doesn't serve a stale render of the old template
+mcporter call chrome-devtools.navigate_page \
+  url='http://127.0.0.1:8080/dashboard.html?cb=2'
+
+# 3. scroll the target element into view, then screenshot TO A FILE
+#    (inline base64 bloats context; a file path stays cheap)
+mcporter call chrome-devtools.evaluate_script \
+  --function '()=>{const el=document.querySelector("#my-canvas").closest("div");el.scrollIntoView({block:"center"});return{ok:true}}'
+mcporter call chrome-devtools.take_screenshot --filePath /tmp/shot.png
+
+# 4. analyze with a STRUCTURED prompt — numbered yes/no beats vague prose
+mcporter call zai-vision.analyze_data_visualization \
+  image_source=/tmp/shot.png \
+  prompt="Verify and answer each: 1) Is the curve U-shaped with min near 20%? 2) X-axis labeled and linear 0-55%? 3) Green target line present? 4) Anything clipped/overlapping? Verdict: OK or list problems."
+```
+
+Tool choice by what you're verifying:
+
+| Artifact | vision tool |
+|---|---|
+| Chart / plot / data table | `analyze_data_visualization` |
+| General layout, spacing, typography | `analyze_image` |
+| Regression vs a known-good reference | `ui_diff_check` (pass both images) |
+| Text content / labels / numbers | `extract_text_from_screenshot` |
+
+**The prompt is the lever.** A vague prompt ("does this look ok?") gets a vague
+yes. A structured prompt with numbered, checkable assertions gets a reliable
+per-item verdict and surfaces the one thing that's wrong. Write the checklist
+you'd hand a human QA.
+
+**Cold start:** the first `zai-vision` call after daemon restart may time out
+(STDIO server spinning up). Retry once. If it persists, `mcporter daemon
+restart` and wait a few seconds.
+
+Iterate: fix → rebuild → `?cb=3` → screenshot → analyze, until the verdict is
+OK. Two to four rounds is typical for a non-trivial chart.
+
+---
+
 ## See also
 
 - `../SKILL.md` — top tools and the research loop
 - `tools.md` — every tool, every param
+- the `chrome-devtools` skill — capture half of this loop
