@@ -118,23 +118,37 @@ Always use `--detach` to keep the daemon alive between calls.
 
 ## Language-specific notes
 
-### TypeScript/JavaScript
-- Server: `typescript-language-server` (npm install -g typescript-language-server typescript)
-- Needs `package.json` or `tsconfig.json` in workspace root
-- `list-symbols` and `list-functions` work reliably
-- `grep` / `definition` / `references` may return empty if project isn't indexed yet — try opening a file first or wait longer
+| Language | list-symbols | list-functions | grep | definition | diagnostics |
+|---|---|---|---|---|---|
+| **Rust** | ✅ | ✅ | ✅ | ✅ | ⚠️ pull model |
+| **TypeScript/JS** | ✅ | ✅ | ⚠️ project-dependent¹ | ⚠️ depends on grep | ⚠️ push model² |
+| **Python** | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ |
+| **Go** | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ |
+| **C/C++** | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ |
 
-### Python
-- Server: `pyright-langserver` (pip install pyright)
-- Needs `pyproject.toml` or `setup.py` in workspace root
+¹ TSServer `workspace/symbol` quality varies by project config — may return
+empty for some projects. This is a TSServer limitation, not lsp-cli.
 
-### Go
-- Server: `gopls` (go install golang.org/x/tools/gopls@latest)
-- Needs `go.mod` in workspace root
+² TSServer uses push diagnostics — requires `tsconfig.json` with `checkJs: true`
+for JS files. Works for `.ts` files in properly configured projects.
 
-### Rust
-- Server: `rust-analyzer` (rustup component add rust-analyzer)
-- Needs `Cargo.toml` in workspace root
+³ Expected to work based on server capabilities — not tested on this machine.
+
+Install servers:
+
+```bash
+# TypeScript/JavaScript
+npm install -g typescript-language-server typescript
+
+# Rust
+rustup component add rust-analyzer
+
+# Python
+pip install pyright
+
+# Go
+go install golang.org/x/tools/gopls@latest
+```
 
 ## Flags worth remembering
 
@@ -158,11 +172,12 @@ Always use `--detach` to keep the daemon alive between calls.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| `lsp-cli: command not found` | `cargo install --git https://github.com/e4779/lsp-cli.git` |
-| `No language server found` | `lsp-cli detect .` to see available servers; install missing ones (`npm install -g typescript-language-server`, etc.) |
-| Empty results from `grep` / `definition` | LSP server may not have indexed yet — open a file first: `lsp-cli list-symbols src/app.ts` |
-| `grep` returns nothing but `rg` finds it | `grep` uses workspace/symbol which varies by server — fall back to `list-symbols` or `list-functions` |
-| Slow first call | Always use `--detach`; consider `lsp-cli daemon .` for long sessions |
-| Language-specific LSP not in PATH | Install the server globally (`npm install -g`, `pip install`, `go install`) then re-run `lsp-cli detect .` |
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `lsp-cli: command not found` | Not installed | `cargo install --git https://github.com/e4779/lsp-cli.git` |
+| `No language server found` | LSP binary missing | `lsp-cli detect .` to see available servers; install per table above |
+| `grep` returns empty, `rg` finds it | TSServer limitation (TS/JS) | Use `list-symbols` or `list-functions` instead — they're file-level and reliable |
+| `definition` returns empty | Same as grep (workspace/symbol) | If TS/JS: use `list-symbols` to find the file, then `read` it |
+| Slow first call | Cold server start | Use `--detach`; start daemon early: `lsp-cli daemon . &` |
+| `diagnostics` returns empty | LSP server behavior | Not all servers push diagnostics promptly; use language-specific linters as fallback |
+| `rust-analyzer` times out on first run | Indexing large project | Increase timeout: `--timeout 60`; use daemon to amortize cost |
