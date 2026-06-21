@@ -138,43 +138,39 @@ just a bug report. Don't over-engineer.
 
 ### Track E — pisub robustness bugs (filed from session observation)
 
-**E1. Daemon dies silently if `~/.pisub/agents/` is missing at spawn time.**
-Observed: `rm -rf ~/.pisub/agents && pisub spawn ...` — the daemon started
-(registry entry written, pid assigned) but produced no daemon log in
-`/tmp/pisub-<uid>/` and died without `agent_end`. `ensureDirs()` is called
-in `runDaemon` (line 308) but something downstream still fails when the dir
-was absent at spawn. Repro: `rm -rf ~/.pisub/agents; pisub spawn t --model
-zai-coding/glm-4.7 --cwd /tmp` then `pisub wait t` → "daemon gone, no
-agent_end".
+**E1. Daemon dies silently when `~/.pisub/agents/` disappears mid-run (unhandled ENOENT in `appendJsonl`).**
+Repro confirmed: an agent that runs `rm -rf ~/.pisub/agents` (e.g. executing an acceptance test that cleans its own slate) kills its own log directory mid-run. `appendJsonl` (line 135) calls `appendFileSync(path, …)` with **no try/catch**; the ENOENT flies up into the `rl.on("line", …)` callback in `runDaemon`, crashes the daemon, and no `agent_end` is emitted — so `pisub wait` hangs until its timeout. (This is what killed agent `ac1` during the Track A acceptance test.)
 
-Fix direction: ensure `ensureDirs()` runs early and any downstream write
-(`appendJsonl`, `appendFileSync` to daemon log) handles missing-dir
-gracefully OR the daemon fails loudly with a clear error instead of dying
-silently. Also: `pisub spawn` should verify the daemon came up (it already
-pings the socket, but the daemon can answer ping while being half-broken).
+Note: the original hypothesis — "missing dir at spawn" — does NOT reproduce: `ensureDirs()` (line 308) plus `socketPathFor` (which `mkdirSync`s `/tmp/pisub-<uid>/`) cover the spawn path. The bug is strictly mid-run dir disappearance, which is rare in normal use but catastrophic when it happens (silent hang, no diagnostics).
+
+Fix direction:
+- Wrap `appendJsonl`'s `appendFileSync` in try/catch. On ENOENT (or any write error): re-`ensureDirs()` once and retry; if still failing, emit a synthetic `agent_end`-equivalent to the daemon log + socket clients and shut down cleanly (so `pisub wait` returns instead of hanging).
+- Same treatment for the `appendFileSync(daemonLog, …)` calls in `runDaemon` (they already tolerate the fd write, but not the daemonLog append itself).
+- Do NOT make `appendJsonl` silently swallow errors — the goal is loud-then-graceful-shutdown, not silent drop.
 
 **Steps:**
-- [ ] reproduce deterministically; find where exactly the daemon dies
-- [ ] fix: either ensureDirs covers all paths, or fail loudly at spawn
-- [ ] regression: `rm -rf ~/.pisub/agents && pisub spawn ...` works end-to-end
+- [x] reproduce: agent runs `rm -rf ~/.pisub/agents` mid-run → daemon dies, no agent_end, `pisub wait` hangs
+- [x] root cause: `appendJsonl` → `appendFileSync` with no try/catch; ENOENT crashes `rl.on("line")`
+- [x] fix: try/catch in `appendJsonl`, re-ensureDirs + retry once, then graceful shutdown with synthetic agent_end
+- [x] regression: agent runs `rm -rf ~/.pisub/agents` → daemon recovers (ensureDirs recreates dir), wait returns exit 0; permanent failure (read-only dir) → FATAL logged, wait returns in <1s (no hang)
 
 ---
 
 **E2. `pisub report` returns empty for glm-4.7 agents — they put their final summary in `thinking`, not `text`.**
-Observed twice (agents `tb1` and `ac2`, both glm-4.7, both exit 0 via `pisub wait`). The agent reaches `agent_end` but `pisub report` prints "no assistant text found". Root cause confirmed: 12 of 14 assistant turns in the ac2 log carry `content_types=['thinking','toolCall']` with NO `text` block. The final turn has `content_types=['thinking']` only, and the thinking block contains the full implementation report ("Track A + C — Implementation Report..."). `extractAssistantReports` filters for `type=='text'` blocks and skips everything else, so it sees zero reportable content.
+Observed twice (agents `tb1` and `ac2`, both glm-4.7, both exit 0 via `pisub wait`). The agent reaches `agent_end` but `pisub report` prints "no assistant text found". Root cause confirmed: 12 of 14 assistant turns in the ac2 log carry `content_types=['thinking','toolCall']` with NO `text` block. The final turn has `content_types=['thinking']` only, and the thinking block contains the full implementation report ("Track A + C — Implementation Report..."). `extractAssistantReports` (line 970) and its inline copy in `cmdReport` (line 1010) filter for `type=='text'` blocks and skip everything else, so they see zero reportable content.
 
 This is NOT an output-token-limit issue (lazy prior hypothesis, discarded). It's a model-behavior + parser mismatch: glm-4.7 reasons and summarizes inside thinking blocks; the report extractor ignores thinking.
 
 Fix direction:
-- `extractAssistantReports`: when an assistant turn has no `text` block but has a `thinking` block, fall back to extracting the thinking content (label it clearly as thinking-derived).
-- OR: always include thinking alongside text, marked, so the report is never empty for a model that thinks-then-acts.
-- Consider: some models emit a final text block AFTER thinking — verify glm-4.7 doesn't do that and we're not racing the log flush.
+- In both `extractAssistantReports` and the inline copy in `cmdReport`: collect `b.type === "thinking"` content alongside `text`. When a turn has no `text` block but has `thinking`, fall back to thinking — label it clearly (e.g. prefix `[from thinking]\n`) so the reader knows it's reasoning, not a final answer.
+- Keep collecting `text` preferentially when both exist (text is the model's intended output; thinking is a fallback).
+- Add a `thinking` field to the `AssistantReport` interface so callers can distinguish.
 
 **Steps:**
 - [x] reproduce: confirmed on ac2.log (12/14 assistant turns thinking-only)
-- [x] root cause: `extractAssistantReports` skips thinking; glm-4.7 puts summary in thinking
-- [ ] fix: fall back to thinking content when no text block, labelled clearly
-- [ ] test: re-run report on ac2.log, must show the implementation report from thinking
+- [x] root cause: `extractAssistantReports` + inline copy skip thinking; glm-4.7 puts summary in thinking
+- [x] fix: collect thinking in both places, fall back when no text, label as `[from thinking]`
+- [x] test: `pisub report e2synth` on synthetic thinking-only log shows the report with `[from thinking]` label; `--last N` header includes `[from thinking]` marker
 
 ---
 

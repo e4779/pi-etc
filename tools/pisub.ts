@@ -132,8 +132,22 @@ function gcRegistry(): Registry {
 // Logging
 // ---------------------------------------------------------------------------
 
-function appendJsonl(path: string, obj: unknown) {
-  appendFileSync(path, JSON.stringify(obj) + "\n");
+function appendJsonl(path: string, obj: unknown): boolean {
+  const line = JSON.stringify(obj) + "\n";
+  try {
+    appendFileSync(path, line);
+    return true;
+  } catch {
+    // Mid-run dir disappearance (e.g. agent ran `rm -rf ~/.pisub/agents`).
+    // Recover once by re-creating the dir, then retry.
+    try {
+      ensureDirs();
+      appendFileSync(path, line);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 function appendStdin(name: string, cmd: unknown) {
@@ -398,7 +412,16 @@ async function runDaemon(opts: {
       // stat failed, continue appending
     }
 
-    appendJsonl(logPath, wrapped);
+    if (!appendJsonl(logPath, wrapped)) {
+      // Log write failed permanently (e.g. agent ran `rm -rf ~/.pisub/agents`
+      // mid-run). Shut down gracefully so `pisub wait` doesn't hang.
+      appendFileSync(daemonLog, `\n=== FATAL: cannot write to ${logPath} (agents dir disappeared?). Shutting down. ===\n`);
+      for (const c of clients) {
+        try { c.write(JSON.stringify({ type: "event", event: { type: "agent_end", reason: "log_write_failed" } }) + "\n"); } catch {}
+      }
+      shutdown("log_write_failed");
+      return;
+    }
     const summary = summarizeEvent(evt);
     if (summary !== null) appendFileSync(daemonLog, `  << ${summary}\n`);
     for (const c of clients) {
@@ -961,12 +984,16 @@ async function cmdTail(args: string[]) {
 
 interface AssistantReport {
   ts: string;
-  text: string;          // concatenated text blocks
+  text: string;          // concatenated text blocks (or thinking-derived fallback, labelled)
+  thinking?: string;     // raw thinking content if used as fallback
+  fromThinking: boolean; // true when `text` was sourced from a thinking block
   toolCalls: string[];   // tool names invoked this turn (for context)
   stopReason?: string;
 }
 
-/** Extract human-readable assistant turns from the JSONL event log. */
+/** Extract human-readable assistant turns from the JSONL event log.
+ *  Some models (e.g. glm-4.7) put their final summary in a `thinking` block
+ *  with no `text` block. We fall back to thinking in that case, labelled. */
 function extractAssistantReports(events: any[]): AssistantReport[] {
   const reports: AssistantReport[] = [];
   for (const e of events) {
@@ -974,14 +1001,24 @@ function extractAssistantReports(events: any[]): AssistantReport[] {
     const m = e.message;
     if (!m || m.role !== "assistant") continue;
     const text: string[] = [];
+    const thinking: string[] = [];
     const toolCalls: string[] = [];
     for (const b of (m.content ?? [])) {
       if (b.type === "text" && b.text) text.push(b.text);
+      else if (b.type === "thinking" && b.thinking) thinking.push(b.thinking);
       else if (b.type === "toolCall" && b.name) toolCalls.push(b.name);
     }
-    // Skip empty assistant turns (e.g. aborted mid-thinking with no text/tool)
-    if (text.length === 0 && toolCalls.length === 0) continue;
-    reports.push({ ts: e.ts ?? "", text: text.join("\n\n"), toolCalls, stopReason: m.stopReason });
+    // Skip empty assistant turns (no text, no thinking, no tool calls)
+    if (text.length === 0 && thinking.length === 0 && toolCalls.length === 0) continue;
+    const fromThinking = text.length === 0 && thinking.length > 0;
+    reports.push({
+      ts: e.ts ?? "",
+      text: fromThinking ? `[from thinking]\n${thinking.join("\n\n")}` : text.join("\n\n"),
+      thinking: thinking.length > 0 ? thinking.join("\n\n") : undefined,
+      fromThinking,
+      toolCalls,
+      stopReason: m.stopReason,
+    });
   }
   return reports;
 }
@@ -1012,16 +1049,21 @@ async function cmdReport(args: string[]) {
       const m = evt.message;
       if (m && m.role === "assistant") {
         const text: string[] = [];
+        const thinking: string[] = [];
         const toolCalls: string[] = [];
         for (const b of (m.content ?? [])) {
           if (b.type === "text" && b.text) text.push(b.text);
+          else if (b.type === "thinking" && b.thinking) thinking.push(b.thinking);
           else if (b.type === "toolCall" && b.name) toolCalls.push(b.name);
         }
-        // Skip empty assistant turns
-        if (text.length > 0 || toolCalls.length > 0) {
+        // Skip empty assistant turns (no text, no thinking, no tool calls)
+        if (text.length > 0 || thinking.length > 0 || toolCalls.length > 0) {
+          const fromThinking = text.length === 0 && thinking.length > 0;
           const report: AssistantReport = {
             ts: evt.ts ?? "",
-            text: text.join("\n\n"),
+            text: fromThinking ? `[from thinking]\n${thinking.join("\n\n")}` : text.join("\n\n"),
+            thinking: thinking.length > 0 ? thinking.join("\n\n") : undefined,
+            fromThinking,
             toolCalls,
             stopReason: m.stopReason,
           };
@@ -1060,7 +1102,7 @@ async function cmdReport(args: string[]) {
     if (n > 1) {
       const sep = i > 0 ? "\n" + "─".repeat(60) + "\n" : "";
       process.stdout.write(sep);
-      process.stdout.write(`[#${idx}  ${r.ts.slice(11, 19)}${r.stopReason ? `  stop=${r.stopReason}` : ""}${r.toolCalls.length ? `  tools=${r.toolCalls.join(",")}` : ""}]\n`);
+      process.stdout.write(`[#${idx}  ${r.ts.slice(11, 19)}${r.fromThinking ? `  [from thinking]` : ""}${r.stopReason ? `  stop=${r.stopReason}` : ""}${r.toolCalls.length ? `  tools=${r.toolCalls.join(",")}` : ""}]\n`);
     }
     process.stdout.write(r.text);
     if (!r.text.endsWith("\n")) process.stdout.write("\n");
