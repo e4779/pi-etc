@@ -180,35 +180,45 @@ model), `spec` (implementation spec), `description` (prose description).
 
 ## Recipe 8 — Render verification loop (chrome-devtools → zai-vision)
 
-> *You rendered an HTML report / dashboard / chart and want to verify it
-> looks right — without eyeballing the pixels yourself (or when your model
-> can't see images). The two skills compose: chrome-devtools captures,
-> zai-vision judges.*
+> *You rendered an HTML page / dashboard / chart and want to verify it looks
+> right — without eyeballing the pixels yourself (or when your model can't
+> see images). The two skills compose: chrome-devtools captures, zai-vision
+> judges.*
 
-This catches bugs that code review misses. Real catch: a Chart.js chart used a
-`category` X-axis where `linear` was needed → the axis showed `0–9` instead of
-`5–50%`, and annotation plugins silently never fired. The code *looked* correct;
-the screenshot + vision analysis proved it wasn't.
+This catches bugs that code review misses. The code *looked* correct — but a
+JS charting library defaulted to a `category` axis where a numeric/`linear` one
+was needed, so the axis labels showed the array indices (`0–9`) instead of the
+real data range, and an annotation plugin silently never fired. The screenshot
++ vision analysis proved it was broken.
+
+Whatever your stack — static HTML, a dev server, a built report, a generated
+PDF opened in a browser — the loop is the same: **rebuild → screenshot the
+live page → ask vision to check it against a structured checklist.**
 
 ```bash
-# 1. rebuild the artifact (mk/cargo/whatever your pipeline uses)
-mk reports/dashboard.html
+# 1. rebuild the artifact through WHATEVER pipeline it uses
+#    (make, cargo, npm run build, a doc generator, a CI step…)
+<your build command>
 
-# 2. force a FRESH load — append a cache-buster query param each iteration
-#    so chrome doesn't serve a stale render of the old template
+# 2. load the page in chrome, FRESH each iteration.
+#    Append a cache-buster query param (?v=2, ?cb=3, ...) so chrome never
+#    serves a stale render of the old template from its HTTP cache.
 mcporter call chrome-devtools.navigate_page \
-  url='http://127.0.0.1:8080/dashboard.html?cb=2'
+  url='http://localhost:8000/path/to/page.html?v=2'
 
-# 3. scroll the target element into view, then screenshot TO A FILE
-#    (inline base64 bloats context; a file path stays cheap)
+# 3. scroll the target region into view, then screenshot TO A FILE.
+#    (inline base64 bloats context; a file path stays cheap and reusable
+#    across iterations and comparisons.)
 mcporter call chrome-devtools.evaluate_script \
-  --function '()=>{const el=document.querySelector("#my-canvas").closest("div");el.scrollIntoView({block:"center"});return{ok:true}}'
+  --function '()=>{const el=document.querySelector("#target");el.scrollIntoView({block:"center"});return{ok:true}}'
 mcporter call chrome-devtools.take_screenshot --filePath /tmp/shot.png
 
-# 4. analyze with a STRUCTURED prompt — numbered yes/no beats vague prose
+# 4. analyze with a STRUCTURED prompt — numbered yes/no beats vague prose.
+#    Pick the prompt to match what you changed; pick the tool to match what
+#    the artifact IS (see the table below).
 mcporter call zai-vision.analyze_data_visualization \
   image_source=/tmp/shot.png \
-  prompt="Verify and answer each: 1) Is the curve U-shaped with min near 20%? 2) X-axis labeled and linear 0-55%? 3) Green target line present? 4) Anything clipped/overlapping? Verdict: OK or list problems."
+  prompt="Answer each yes/no: 1) <expected visual fact>? 2) <label/axis/legend present and correct>? 3) <colors as intended>? 4) Anything clipped, overlapping, or missing? Final verdict: OK or list the concrete problems."
 ```
 
 Tool choice by what you're verifying:
@@ -223,14 +233,15 @@ Tool choice by what you're verifying:
 **The prompt is the lever.** A vague prompt ("does this look ok?") gets a vague
 yes. A structured prompt with numbered, checkable assertions gets a reliable
 per-item verdict and surfaces the one thing that's wrong. Write the checklist
-you'd hand a human QA.
+you'd hand a human QA: "is the axis linear 0–100?", "is the legend on the
+right?", "is the warning badge amber, not red?".
 
 **Cold start:** the first `zai-vision` call after daemon restart may time out
 (STDIO server spinning up). Retry once. If it persists, `mcporter daemon
 restart` and wait a few seconds.
 
-Iterate: fix → rebuild → `?cb=3` → screenshot → analyze, until the verdict is
-OK. Two to four rounds is typical for a non-trivial chart.
+Iterate: fix → rebuild → `?v=3` → screenshot → analyze, until the verdict is
+OK. Two to four rounds is typical for a non-trivial artifact.
 
 ---
 
