@@ -18,7 +18,7 @@ pi-etc/
 
 ## Миграция (этот этап) ✅
 
-- [x] **pi-lint-check-extension** → `extensions/lint-check.ts` (index.ts + lint-check-core.ts слиты в один файл)
+- [x] **pi-lint-check-extension** → `extensions/lint-check/index.ts` (index.ts + lint-check-core.ts слиты в один файл)
 - [x] **pi-qwen** → `extensions/qwen/index.ts` + system-prompt.ts, edit-qwen.ts, tool-call-extractor.ts
 - [x] **pi-way-skill** → `extensions/pi-way.ts` + `skills/pi-way/SKILL.md`
 - [x] **pi-session** → `skills/pi-session/SKILL.md` + `tools/pi-session.ts`
@@ -31,7 +31,9 @@ pi-etc/
 ```
 pi-e4779/
 ├── extensions/
-│   ├── lint-check.ts          # pi-lint-check (слитый)
+│   ├── lint-check/          # pi-lint-check (слитый)
+│   │   ├── index.ts
+│   │   └── README.md
 │   ├── pi-way.ts              # pi-way-skill (инжектор принципов)
 │   └── qwen/
 │       ├── index.ts           # pi-qwen (entry point)

@@ -38,7 +38,7 @@
       "extensions": [
         "extensions/pi-way.ts",
         "extensions/qwen/index.ts",
-        "extensions/lint-check.ts"
+        "extensions/lint-check/index.ts"
       ],
       "skills": [
         "pi-session",
@@ -59,7 +59,7 @@
 | `gitverse.ru/e4779/pi-way-skill` | `extensions/pi-way.ts` + `skills/pi-way/` |
 | `gitverse.ru/e4779/pi-skill-deepthink` | `skills/deepthink/` + `bin/tot-*` |
 | `gitverse.ru/e4779/skill-layout-check` | `skills/layout-check/` |
-| *(новое)* | `extensions/lint-check.ts` |
+| *(новое)* | `extensions/lint-check/index.ts` |
 
 ## Шаг 2: удалить локальные репозитории
 

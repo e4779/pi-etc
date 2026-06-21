@@ -1,4 +1,9 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ExtensionEvent } from "@earendil-works/pi-coding-agent";
+
+// pi-coding-agent does not re-export MessageEndEvent from its root entry
+// (internal types live under dist/core/extensions/types.ts which is not in
+// package.json `exports`). Derive it from the ExtensionEvent union instead.
+type MessageEndEvent = Extract<ExtensionEvent, { type: "message_end" }>;
 import { getCoreSystemPrompt } from "./system-prompt.js";
 import { createEditToolDefinition } from "./edit-qwen.js";
 import { extractToolCallsFromMessage } from "./tool-call-extractor.js";
@@ -71,14 +76,18 @@ export default function (pi: ExtensionAPI) {
   // ---- Hook: message_end (extract tool calls from thinking blocks) ----
   // Qwen models sometimes encode tool calls as XML inside <thinking> blocks
   // instead of proper JSON tool_use content blocks. This handler extracts them.
-  pi.on("message_end", async (event, _ctx) => {
+  pi.on("message_end", async (event: MessageEndEvent, _ctx: ExtensionContext) => {
     if (event.message.role !== "assistant") return;
 
     const content = event.message.content;
     if (!Array.isArray(content)) return;
 
+    // extractToolCallsFromMessage works on a generic content-block shape.
+    // The pi SDK types each block as a discriminated union (TextContent |
+    // ThinkingContent | ToolCall); cast through unknown to the generic shape
+    // the helper expects rather than touching ToolCall's narrower fields.
     const newContent = extractToolCallsFromMessage(
-      content as Array<{ type: string; [key: string]: unknown }>,
+      content as unknown as Array<{ type: string; [key: string]: unknown }>,
     );
 
     if (newContent) {
@@ -86,7 +95,11 @@ export default function (pi: ExtensionAPI) {
       console.log(
         `[pi-qwen] extracted ${newContent.length - content.length} tool call(s) from thinking`,
       );
-      return { message: { ...event.message, content: newContent } };
+      // Cast back through unknown: we replaced the content array with
+      // structurally-compatible blocks, but TS only knows the helper's generic
+      // output shape, not the pi AgentMessage['content'] union. This matches
+      // what pi's MessageEndEventResult.message expects.
+      return { message: { ...event.message, content: newContent as unknown as typeof content } };
     }
   });
 

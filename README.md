@@ -22,7 +22,7 @@ pi install ~/dev/pi-etc -l
 | Расширение | Файл | Описание |
 |---|---|---|
 | **pi-way** | `extensions/pi-way.ts` | Инжектит принципы pi-way в системный промпт каждого сеанса |
-| **lint-check** | `extensions/lint-check.ts` | Запускает линтеры через nano-staged после каждого хода агента |
+| **lint-check** | `extensions/lint-check/index.ts` | Запускает линтеры через nano-staged после каждого хода агента |
 | **qwen-flavor** | `extensions/qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
 
 ### Скиллы (`skills/`)
@@ -158,7 +158,9 @@ pi -e ~/dev/pi-etc/extensions/pi-way.ts
 ```
 pi-etc/
 ├── extensions/           # Расширения (одно .ts на расширение или вложенная директория)
-│   ├── lint-check.ts
+│   ├── lint-check/
+│   │   ├── index.ts
+│   │   └── README.md
 │   ├── pi-way.ts
 │   └── qwen/
 │       ├── index.ts
