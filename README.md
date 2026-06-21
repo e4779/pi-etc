@@ -30,7 +30,8 @@ pi install ~/dev/pi-etc -l
 | Скилл | Команда | Описание |
 |---|---|---|
 | **pi-way** | `/skill:pi-way` | Философия pi: саб-агенты, Makefile, PLAN.md/TODO.md, tmux |
-| **pi-session** | `/skill:pi-session` | Парсинг и инспекция JSONL-сессий pi агента |
+| **pi-session** | `/skill:pi-session` | Парсинг и инспекция JSONL-сессий pi агента (summary, grep, context, timeline) |
+| **pisub** | `/skill:pisub` | Суб-агенты через tmux + RPC: spawn/send/steer/wait/report/run |
 | **deepthink** | `/skill:deepthink` | Tree-of-Thoughts для сложных решений |
 | **layout-check** | `/skill:layout-check` | Верификация CSS-вёрстки через Chrome DevTools |
 | **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP (без раздувания контекста на 18k токенов) |
@@ -170,18 +171,20 @@ pi-etc/
 ├── skills/               # Скиллы (SKILL.md в поддиректориях)
 │   ├── pi-way/SKILL.md
 │   ├── pi-session/SKILL.md
+│   ├── pisub/SKILL.md
 │   ├── deepthink/SKILL.md
-│   ├── layout-check/        
+│   ├── layout-check/
 │   │   ├── SKILL.md
 │   │   └── scripts/layoutProbe.mjs
-│   └── chrome-devtools/
+│   ├── chrome-devtools/
+│   │   ├── SKILL.md
+│   │   └── references/         # setup/tools/recipes — грузятся по требованию
+│   └── zai-mcp/
 │       ├── SKILL.md
-│       └── references/       # tools.md + recipes.md — грузятся по требованию
-├── zai-mcp/
-│   ├── SKILL.md
-│   └── references/           # tools.md (13 tools) + recipes.md (7 сценариев)
+│       └── references/           # tools.md (13 tools) + recipes.md (7 сценариев)
 ├── tools/                # CLI-утилиты
-│   └── pi-session.ts
+│   ├── pi-session.ts          # инспекция сессий (--summary, --grep, --context, --timeline)
+│   └── pisub.ts               # суб-агенты: spawn/send/steer/wait/report/run
 ├── bin/                  # Shell-скрипты
 │   ├── tot-add
 │   ├── tot-status
