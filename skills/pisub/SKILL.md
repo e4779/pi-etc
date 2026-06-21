@@ -50,6 +50,19 @@ pisub kill researcher
 | Fully isolated context (fresh, no parent pollution) | **pisub** (always spawns fresh). |
 | `Agent` tool available and task is simple one-shot | Either works. `pisub run` gives you a durable JSONL log; `Agent` tool returns inline. |
 
+## Available sub-agent profiles
+
+Check what's installed before spawning — each profile bundles a role + model:
+
+```bash
+ls ~/.pisub/profiles/ | grep -v '\\.md$'
+```
+
+Named profiles (e.g. `rust-coder`, `wiki-maintainer`) become ordinary commands
+on your PATH after `export PATH="$HOME/.pisub/profiles:$PATH"`. They accept
+`<name>` and any `pisub spawn` flags. Use the `--system-prompt-file` flag to
+point to a `.prompt.md` for custom roles. Details: [profiles](references/profiles.md).
+
 ## One-shot delegation: `pisub run`
 
 For fire-and-forget tasks (the most common delegation pattern), use `run`. It composes the existing primitives:
