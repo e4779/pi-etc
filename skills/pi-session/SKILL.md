@@ -3,6 +3,12 @@ name: pi-session
 description: "Parse and inspect pi agent session JSONL files. Commands: --summary, --last N, --role ROLE, --grep TEXT, --grep-dir DIR TEXT, --list, --list-sessions, --list-subagents, --find UUID"
 ---
 
+**Scope:** pi-session inspects **pi agent sessions** only — files in
+`~/.pi/agent/sessions/`. It does NOT read pisub RPC logs
+(`~/.pisub/agents/*.log`); those use a different schema and running
+pi-session on them would truncate the file. For pisub logs use
+`pisub log <name>`, `pisub report <name>`, or `pisub grep <name> <text>`.
+
 The `pi-session` tool parses pi agent session JSONL files using the pi agent SDK — always in sync with pi's format.
 
 Sessions live in `~/.pi/agent/sessions/<project>/`.

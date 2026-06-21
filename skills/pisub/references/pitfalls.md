@@ -2,6 +2,13 @@
 
 ## Common pitfalls
 
+- **NEVER run `pi-session` on a pisub log.** `pi-session` calls pi's
+  `SessionManager.open()`, which silently truncates any file that isn't a
+  pi session and writes a session header — irreversible data loss. pisub
+  logs are RPC event streams, not pi sessions. Inspect them with
+  `pisub log`, `pisub report`, `pisub grep`. (pi-session refuses pisub
+  logs by content, but don't rely on it — treat `.pisub/agents/*.log` as
+  read-only-by-pisub only.)
 - **Name collisions:** `pisub spawn` refuses if `<name>` is already running. Pick unique names or `pisub kill` first.
 - **Dead registry entries:** if a daemon dies ungracefully (kill -9, OOM), `pisub list` runs GC on the registry automatically — stale entries disappear.
 - **Steering an idle agent:** `steer` queues for the *current* turn. If the agent is idle, use `send` (prompt) instead — `steer` on idle may hang in queue until the next prompt.

@@ -22,9 +22,11 @@
  */
 
 import { execSync, spawnSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, rmSync } from "node:fs";
+import { copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { basename } from "node:path";
 
 // Resolve the globally installed pi agent SDK
 function resolvePiSdk(): string {
@@ -116,8 +118,80 @@ function fuzzyMatch(text: string, query: string): boolean {
 }
 
 function loadEntries(path: string): SessionEntry[] {
+  // B1: Detect pisub logs by content and refuse BEFORE SessionManager.open()
+  // pisub RPC event types — authoritative list
+  const PISUB_EVENT_TYPES = new Set([
+    "response", "agent_start", "agent_end", "turn_start", "turn_end",
+    "message_start", "message_update", "message_end",
+    "tool_execution_start", "tool_execution_update", "tool_execution_end",
+    "queue_update", "compaction_start", "compaction_end",
+    "auto_retry_start", "auto_retry_end", "extension_error"
+  ]);
+
+  // Read first non-empty line to detect pisub log format
+  try {
+    const firstLine = readFileSync(path, "utf-8").split("\n").find((l) => l.trim().length > 0);
+    if (firstLine) {
+      try {
+        const obj = JSON.parse(firstLine);
+        // Check for pisub log: has ts + type in the known event types
+        if ("ts" in obj && "type" in obj && typeof obj.type === "string" && PISUB_EVENT_TYPES.has(obj.type)) {
+          const name = basename(path).replace(/\.log$/, "");
+          console.error(`pi-session: '${path}' is a pisub RPC event log, not a pi session.`);
+          console.error(`  SessionManager.open() would TRUNCATE it — refusing.`);
+          console.error(`  Inspect it with: pisub log ${name} | pisub report ${name} | pisub grep ${name} <text>`);
+          console.error(`  (name = filename without .log)`);
+          process.exit(2);
+        }
+      } catch {
+        // Parse failed: not JSON, fall through to normal SessionManager.open
+      }
+    }
+  } catch {
+    // File read failed: let SessionManager.open handle the error
+  }
+
+  // B2: Backup-before-open (defense in depth)
+  // B1 catches known pisub formats; this catches anything B1 missed (future
+  // event types, malformed lines, other non-session files). We copy to .bak,
+  // open, and if SessionManager rewrote the file, warn + keep .bak. If the
+  // file is a valid pi session (unchanged), delete the temp .bak so we don't
+  // litter ~/.pi/agent/sessions/ with backups on every invocation.
+  let sizeBefore = 0;
+  let madeBackup = false;
+  try {
+    copyFileSync(path, path + ".bak");
+    sizeBefore = statSync(path).size;
+    madeBackup = true;
+  } catch {
+    // File doesn't exist or can't read — SessionManager.open will fail with proper error
+  }
+
   const sm = SessionManager.open(path);
-  return sm.getEntries();
+  const entries = sm.getEntries();
+
+  // Any size change means SessionManager rewrote a foreign file (could even
+  // grow it, if the original was smaller than a session header).
+  if (madeBackup) {
+    try {
+      const sizeAfter = statSync(path).size;
+      if (sizeAfter !== sizeBefore) {
+        console.error(`pi-session: WARNING — '${path}' changed from ${sizeBefore} to ${sizeAfter} bytes`);
+        console.error(`  during SessionManager.open(). It was not a valid pi session. The original`);
+        console.error(`  content was backed up to '${path}.bak'. This indicates a pisub log or`);
+        console.error(`  other non-session file that the B1 detector missed — please report it`);
+        console.error(`  so the detector can be extended.`);
+        // keep .bak — user needs it
+      } else {
+        // Valid session, unchanged — remove the temporary backup
+        try { rmSync(path + ".bak"); } catch { /* best effort */ }
+      }
+    } catch {
+      // Stat failed, can't tell — keep .bak just in case
+    }
+  }
+
+  return entries;
 }
 
 function isMessageEntry(e: SessionEntry): e is SessionMessageEntry {
