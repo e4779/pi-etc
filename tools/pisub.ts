@@ -52,7 +52,7 @@
  */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync, statSync, rmSync, createReadStream } from "node:fs";
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync, statSync, rmSync, createReadStream, renameSync } from "node:fs";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 import * as readline from "node:readline";
@@ -368,6 +368,10 @@ async function runDaemon(opts: {
   appendFileSync(daemonLog, `cwd: ${opts.cwd}\n`);
   appendFileSync(daemonLog, `socket: ${sockPath}\n\n`);
 
+  // Read the env var ONCE at daemon start (not on every line — it won't change
+  // mid-run):
+  const maxBytes = (parseInt(process.env.PISUB_MAX_LOG_MB ?? "100", 10)) * 1024 * 1024;
+
   // Pipe pi rpc stdout → parse JSONL → log + emit to clients
   const rl = readline.createInterface({ input: pi.stdout!, crlfDelay: Infinity });
   const clients = new Set<Socket>();
@@ -377,7 +381,24 @@ async function runDaemon(opts: {
     let evt: any;
     try { evt = JSON.parse(line); } catch { return; }
     const wrapped = { ts: new Date().toISOString(), ...evt };
-    appendJsonl(agentLogPath(opts.name), wrapped);
+
+    // Log rotation: check size BEFORE appending
+    const logPath = agentLogPath(opts.name);
+    try {
+      if (existsSync(logPath) && statSync(logPath).size >= maxBytes) {
+        const rotatedPath = logPath + ".1";
+        try {
+          renameSync(logPath, rotatedPath);
+          appendFileSync(daemonLog, `=== log rotated at ${statSync(rotatedPath).size} bytes ===\n`);
+        } catch {
+          // Rename failed, continue appending (don't crash)
+        }
+      }
+    } catch {
+      // stat failed, continue appending
+    }
+
+    appendJsonl(logPath, wrapped);
     const summary = summarizeEvent(evt);
     if (summary !== null) appendFileSync(daemonLog, `  << ${summary}\n`);
     for (const c of clients) {
@@ -1198,6 +1219,99 @@ async function cmdAttach(args: string[]) {
   spawnSync("tmux", ["new-session", "-t", sess, `tail -F ${daemonLogPath(name)}`], { stdio: "inherit" });
 }
 
+// ---------------------------------------------------------------------------
+// gc — garbage-collect old logs for dead agents
+// ---------------------------------------------------------------------------
+
+/** Parse --age arg (default "24h"). Returns milliseconds.
+ * Formats: "30m", "4h", "2d", plain number = hours.
+ */
+function parseAge(age: string | undefined): number {
+  if (!age) return 24 * 60 * 60 * 1000;  // 24h default
+  if (!age.match(/^(\d+)([mhd])?$/)) {
+    die(`invalid --age: '${age}'. Use <N>, <N>m, <N>h, or <N>d`);
+  }
+  const m = age.match(/^(\d+)([mhd]?)$/)!;
+  const val = parseInt(m[1], 10);
+  const unit = m[2] ?? "h";
+  switch (unit) {
+    case "m": return val * 60 * 1000;
+    case "h": return val * 60 * 60 * 1000;
+    case "d": return val * 24 * 60 * 60 * 1000;
+    default: throw new Error("unreachable");
+  }
+}
+
+async function cmdGc(args: string[]) {
+  // Defensive: refuse if AGENTS_DIR looks suspicious
+  if (!AGENTS_DIR || AGENTS_DIR === "/") {
+    die(`gc: refusing to run — AGENTS_DIR='${AGENTS_DIR}' looks unsafe`);
+  }
+  if (!existsSync(AGENTS_DIR)) {
+    console.log("gc: no agents directory");
+    return;
+  }
+
+  // Parse --age (default "24h")
+  let age = "24h";
+  const ai = args.indexOf("--age");
+  if (ai >= 0 && args[ai + 1]) age = args[ai + 1];
+  const ageMs = parseAge(age);
+  const now = Date.now();
+
+  // Load registry once
+  const reg = loadRegistry();
+  let deletedCount = 0;
+  let skippedCount = 0;
+  let totalBytes = 0;
+
+  // List all files in AGENTS_DIR
+  const { readdirSync } = await import("node:fs");
+  let files: string[];
+  try {
+    files = readdirSync(AGENTS_DIR);
+  } catch (e: any) {
+    die(`gc: cannot read ${AGENTS_DIR}: ${e.message}`);
+  }
+
+  for (const file of files) {
+    // Match <name>.log, <name>.log.1, <name>.stdin
+    const m = file.match(/^(.+)\.(log(?:\.1)?|stdin)$/);
+    if (!m) continue;
+    const name = m[1];
+    const fullPath = join(AGENTS_DIR, file);
+
+    // Skip if agent is alive in registry
+    const rec = reg[name];
+    if (rec && isAlive(rec)) {
+      skippedCount++;
+      continue;
+    }
+
+    // Check file age
+    let stats: any;
+    try {
+      stats = statSync(fullPath);
+    } catch {
+      continue;  // file disappeared mid-scan
+    }
+    if (now - stats.mtimeMs < ageMs) continue;
+
+    // Delete it
+    try {
+      const size = stats.size;
+      rmSync(fullPath);
+      deletedCount++;
+      totalBytes += size;
+    } catch (e: any) {
+      warn(`gc: failed to delete ${fullPath}: ${e.message}`);
+    }
+  }
+
+  const mb = (totalBytes / (1024 * 1024)).toFixed(2);
+  console.log(`gc: deleted ${deletedCount} files (${mb} MB), skipped ${skippedCount} live agents`);
+}
+
 function cmdHelp() {
   console.log(`pisub — spawn and steer pi agents via tmux + RPC mode
 
@@ -1246,6 +1360,7 @@ ONE-SHOT DELEGATION
 CONTROL
   pisub kill <name>                         terminate agent
   pisub kill --all                          terminate all agents
+  pisub gc [--age 24h]                      garbage-collect logs of dead agents (default 24h old)
 
 FILES
   ~/.pisub/registry.json                    live agents
@@ -1358,6 +1473,7 @@ async function main() {
     case "run":         await cmdRun(rest); break;
     case "kill":        await cmdKill(rest); break;
     case "attach":      await cmdAttach(rest); break;
+    case "gc":          await cmdGc(rest); break;
     default:
       die(`unknown command '${sub}'. Try 'pisub help'.`);
   }

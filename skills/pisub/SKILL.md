@@ -39,6 +39,29 @@ pisub events researcher --follow   # raw event stream (pipe to jq/toonq)
 pisub kill researcher
 ```
 
+## Log format & inspection
+
+pisub writes **NDJSON** (one JSON object per line) to
+`~/.pisub/agents/<name>.log`. Each line has a `ts` timestamp and an RPC
+event `type` (e.g. `response`, `agent_start`, `message_update`,
+`tool_execution_start`), plus event-specific fields. This is a live event
+stream — not a pi session.
+
+Inspect logs with standard JSONL tools, NOT pisub:
+
+| Need | Tool |
+|------|------|
+| Search event text | `rg "pattern" ~/.pisub/agents/<name>.log` |
+| Filter by event type | `jq -c 'select(.type=="message_update")' <name>.log` |
+| Count event types | `jq -r .type <name>.log | sort | uniq -c` |
+| Extract assistant text | `jq -r 'select(.type=="message_end" and .message.role=="assistant") | .message.content[] | select(.type=="text") | .text' <name>.log` |
+| Compact TOON view | `cat <name>.log | toonq --from json --slurp --truncate 80` |
+
+**Never run `pi-session` on a pisub log** — it calls pi's `SessionManager.open()`
+which silently truncates non-session files. pi-session now refuses pisub
+logs by content (exit 2), but treat `~/.pisub/agents/*.log` as
+read-with-standard-tools only.
+
 ## When to use pisub vs the `Agent` tool
 
 | Need | Use |

@@ -6,9 +6,13 @@
   `SessionManager.open()`, which silently truncates any file that isn't a
   pi session and writes a session header — irreversible data loss. pisub
   logs are RPC event streams, not pi sessions. Inspect them with
-  `pisub log`, `pisub report`, `pisub grep`. (pi-session refuses pisub
+  `pisub log`, `pisub report`, or `rg`/`jq`/`toonq`. (pi-session refuses pisub
   logs by content, but don't rely on it — treat `.pisub/agents/*.log` as
   read-only-by-pisub only.)
+- **The daemon log (`/tmp/pisub-<uid>/<name>.daemon.log`) is ephemeral.**
+  It's a human-readable echo for `pisub attach` and is wiped on reboot.
+  The durable record is the NDJSON `~/.pisub/agents/<name>.log` — that's
+  what you inspect with `rg`/`jq`/`toonq` and what survives across reboots.
 - **Name collisions:** `pisub spawn` refuses if `<name>` is already running. Pick unique names or `pisub kill` first.
 - **Dead registry entries:** if a daemon dies ungracefully (kill -9, OOM), `pisub list` runs GC on the registry automatically — stale entries disappear.
 - **Steering an idle agent:** `steer` queues for the *current* turn. If the agent is idle, use `send` (prompt) instead — `steer` on idle may hang in queue until the next prompt.
