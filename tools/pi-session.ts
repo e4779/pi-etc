@@ -403,6 +403,224 @@ function cmdGrep(entries: SessionEntry[], text: string, roleFilter?: string, jso
 }
 
 // ---------------------------------------------------------------------------
+// Context-around-match — show N messages before/after each match.
+// Fixes the ad-hoc Python scripts we kept writing (with syntax errors on
+// f-strings containing the query text). Common question this answers:
+//   "the agent wrote `as any` — what was the user asking for right before?"
+// ---------------------------------------------------------------------------
+
+interface MessageSlot {
+  index: number;            // index in the filtered message list
+  role: string;
+  text: string;             // human-readable text (text blocks joined)
+  timestamp: string;
+}
+
+/** Collect all message entries into compact slots (for context display). */
+function collectMessageSlots(entries: SessionEntry[]): MessageSlot[] {
+  const slots: MessageSlot[] = [];
+  let i = 0;
+  for (const e of entries) {
+    if (!isMessageEntry(e)) continue;
+    slots.push({
+      index: i++,
+      role: e.message.role,
+      text: extractAllText(e.message),
+      timestamp: (e as { timestamp?: string }).timestamp ?? "",
+    });
+  }
+  return slots;
+}
+
+function cmdContext(
+  entries: SessionEntry[],
+  text: string,
+  around: number,
+  roleFilter?: string,
+  json = false,
+) {
+  const normalized = normalizeWhitespace(text);
+  const slots = collectMessageSlots(entries).filter(
+    s => !roleFilter || s.role === roleFilter || true, // roleFilter applies to MATCHES only; context keeps all roles
+  );
+
+  const matchIdxs: number[] = [];
+  for (const s of slots) {
+    if (roleFilter && s.role !== roleFilter) continue;
+    if (fuzzyMatch(s.text, normalized)) matchIdxs.push(s.index);
+  }
+
+  if (matchIdxs.length === 0) {
+    if (!json) console.error(`No matches for "${text}".`);
+    else console.log(JSON.stringify({ matches: 0, groups: [] }, null, 2));
+    return;
+  }
+
+  // Build non-overlapping windows [start, end] around each match.
+  const groups: { matchIndex: number; before: MessageSlot[]; match: MessageSlot; after: MessageSlot[] }[] = [];
+  let lastEnd = -1;
+  for (const mi of matchIdxs) {
+    const start = Math.max(0, mi - around);
+    const end = Math.min(slots.length - 1, mi + around);
+    // If overlaps previous window, merge (avoid double-printing).
+    if (start <= lastEnd) {
+      // extend previous group
+      const g = groups[groups.length - 1];
+      for (let j = lastEnd + 1; j <= end; j++) {
+        if (j === mi) continue;
+        if (j < mi) g.before.push(slots[j]);
+        else g.after.push(slots[j]);
+      }
+      lastEnd = end;
+      continue;
+    }
+    groups.push({
+      matchIndex: mi,
+      before: slots.slice(start, mi),
+      match: slots[mi],
+      after: slots.slice(mi + 1, end + 1),
+    });
+    lastEnd = end;
+  }
+
+  if (json) {
+    console.log(JSON.stringify({
+      matches: matchIdxs.length,
+      groups: groups.map(g => ({
+        matchIndex: g.matchIndex,
+        match: { role: g.match.role, text: g.match.text, timestamp: g.match.timestamp },
+        before: g.before.map(s => ({ role: s.role, text: s.text, timestamp: s.timestamp })),
+        after:  g.after.map(s => ({ role: s.role, text: s.text, timestamp: s.timestamp })),
+      })),
+    }, null, 2));
+    return;
+  }
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi];
+    if (gi > 0) console.log(`${"─".repeat(60)}`);
+    console.log(`### match ${gi + 1}/${groups.length}  (msg #${g.matchIndex})`);
+    for (const s of g.before) console.log(`  ${fmtSlot(s)}`);
+    console.log(`▶ ${fmtSlot(g.match)}`);
+    for (const s of g.after) console.log(`  ${fmtSlot(s)}`);
+  }
+}
+
+function fmtSlot(s: MessageSlot): string {
+  const ts = s.timestamp ? s.timestamp.slice(11, 19) + "  " : "";
+  const role = s.role.padEnd(9);
+  const text = s.text.length > 200 ? s.text.slice(0, 197) + "…" : s.text;
+  return `${ts}${role}${text}`;
+}
+
+// ---------------------------------------------------------------------------
+// Tool usage — extract tool_use calls from assistant messages.
+// Replaces ad-hoc `grep -oE 'chrome-devtools\.[a-z_]+' | sort | uniq -c`.
+// ---------------------------------------------------------------------------
+
+/** Extract tool-call blocks from a raw message (no SDK needed).
+ *  pi SDK persists these as `type: "toolCall"` with `name` + `arguments`
+ *  (NOT Anthropic's `tool_use`/`input` — we check both for safety). */
+function extractToolUses(message: SessionMessageEntry["message"]): { name: string; input: unknown }[] {
+  if (!Array.isArray(message.content)) return [];
+  return message.content
+    .filter((c): c is Record<string, unknown> => {
+      if (typeof c !== "object" || c === null) return false;
+      const t = (c as { type?: string }).type;
+      return t === "toolCall" || t === "tool_use" || t === "tool_call";
+    })
+    .map(c => ({
+      name: (c as { name?: string }).name ?? "",
+      input: (c as { arguments?: unknown; input?: unknown }).arguments
+        ?? (c as { input?: unknown }).input ?? {},
+    }));
+}
+
+function cmdToolUsage(entries: SessionEntry[], filter?: string, json = false) {
+  const counts = new Map<string, number>();
+  const samples = new Map<string, unknown>();
+  const filterRe = filter ? new RegExp(filter, "i") : null;
+
+  for (const e of entries) {
+    if (!isMessageEntry(e) || e.message.role !== "assistant") continue;
+    for (const tu of extractToolUses(e.message)) {
+      if (filterRe && !filterRe.test(tu.name)) continue;
+      counts.set(tu.name, (counts.get(tu.name) ?? 0) + 1);
+      if (!samples.has(tu.name)) samples.set(tu.name, tu.input);
+    }
+  }
+
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+
+  if (json) {
+    console.log(JSON.stringify({
+      total: sorted.reduce((n, [, c]) => n + c, 0),
+      unique: sorted.length,
+      tools: sorted.map(([name, count]) => ({ name, count, sample: samples.get(name) })),
+    }, null, 2));
+    return;
+  }
+
+  if (sorted.length === 0) {
+    console.log(filter ? `No tool calls matching /${filter}/.` : "No tool calls in session.");
+    return;
+  }
+  const total = sorted.reduce((n, [, c]) => n + c, 0);
+  console.log(`# ${total} tool calls, ${sorted.length} unique${filter ? ` (filter: /${filter}/)` : ""}\n`);
+  for (const [name, count] of sorted) {
+    const pct = ((count / total) * 100).toFixed(0);
+    console.log(`${String(count).padStart(5)}  ${pct.padStart(3)}%  ${name}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Timeline — reconstruct workflow as a sequence of user messages + tool calls.
+// Answers "what did the agent actually DO in order?" without scrolling JSONL.
+// ---------------------------------------------------------------------------
+
+function cmdTimeline(entries: SessionEntry[], limit = 0, json = false) {
+  const events: { ts: string; kind: "user" | "tool"; text: string; tool?: string }[] = [];
+  for (const e of entries) {
+    if (!isMessageEntry(e)) continue;
+    const ts = (e as { timestamp?: string }).timestamp ?? "";
+    if (e.message.role === "user") {
+      const t = extractText(e.message).trim();
+      if (!t || t.startsWith("<")) continue;  // skip system/tool noise
+      events.push({ ts, kind: "user", text: t });
+    } else if (e.message.role === "assistant") {
+      for (const tu of extractToolUses(e.message)) {
+        events.push({
+          ts,
+          kind: "tool",
+          tool: tu.name,
+          text: typeof tu.input === "object" && tu.input !== null
+            ? JSON.stringify(tu.input).slice(0, 120)
+            : String(tu.input).slice(0, 120),
+        });
+      }
+    }
+  }
+
+  const slice = limit > 0 ? events.slice(-limit) : events;
+
+  if (json) {
+    console.log(JSON.stringify(slice, null, 2));
+    return;
+  }
+
+  for (const ev of slice) {
+    const ts = ev.ts ? ev.ts.slice(11, 19) + "  " : "";
+    if (ev.kind === "user") {
+      const text = ev.text.length > 180 ? ev.text.slice(0, 177) + "…" : ev.text;
+      console.log(`${ts}USER  ${text}`);
+    } else {
+      const tool = (ev.tool ?? "?").padEnd(28);
+      console.log(`${ts}      ${tool}${ev.text}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tintinweb subagent output files
 // ---------------------------------------------------------------------------
 
@@ -549,6 +767,15 @@ INSPECT (requires session file):
   pi-session <file.jsonl> --grep TEXT  Search in message text
   pi-session <file.jsonl> --grep TEXT --role user
 
+CONTEXT & WORKFLOW (requires session file):
+  pi-session <file> --context N TEXT   Match TEXT, print N messages around each
+                                       (use --role to restrict matches only)
+  pi-session <file> --context 5 "as any" --role assistant
+  pi-session <file> --tool-usage [REGEX]  Tool-call counts (+ sample input)
+  pi-session <file> --tool-usage chrome  # filter tool names by regex
+  pi-session <file> --timeline [N]       User messages + tool calls in order
+  pi-session <file> --timeline 50        # last 50 events only
+
 Run: npx tsx pi-session.ts <args> (from skill directory)`);
     return;
   }
@@ -643,6 +870,30 @@ Run: npx tsx pi-session.ts <args> (from skill directory)`);
           }
         }
         cmdGrep(entries, query, roleFilter, json);
+        break;
+      }
+      case "--context": {
+        // --context N TEXT [--role ROLE]
+        if (!args[2] || !args[3]) {
+          console.error("Usage: pi-session <file> --context <N> <text> [--role ROLE]");
+          process.exit(1);
+        }
+        const around = parseInt(args[2], 10);
+        const roleIdx = args.indexOf("--role", 3);
+        const roleFilter = roleIdx >= 0 && roleIdx + 1 < args.length ? args[roleIdx + 1] : undefined;
+        cmdContext(entries, args[3], around, roleFilter, json);
+        break;
+      }
+      case "--tool-usage": {
+        // --tool-usage [REGEX]
+        const filter = args[2] && !args[2].startsWith("-") ? args[2] : undefined;
+        cmdToolUsage(entries, filter, json);
+        break;
+      }
+      case "--timeline": {
+        // --timeline [N]
+        const limit = args[2] && /^\d+$/.test(args[2]) ? parseInt(args[2], 10) : 0;
+        cmdTimeline(entries, limit, json);
         break;
       }
       default:

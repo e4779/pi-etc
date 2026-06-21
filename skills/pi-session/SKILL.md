@@ -68,6 +68,10 @@ pi-session --grep-dir ~/.pi/agent/sessions/--proj-- "bug" --json | toonq --from 
 | `--role ROLE` | Filter by role |
 | `--grep TEXT` | Search message content (whitespace-normalized) |
 | `--grep TEXT --role ROLE` | Search with role filter |
+| `--context N TEXT` | **Match TEXT, print N messages around each** (context view) |
+| `--context N TEXT --role ROLE` | Context view, restrict matches to ROLE |
+| `--tool-usage [REGEX]` | **Tool-call counts** + sample input (filter tool names) |
+| `--timeline [N]` | **Workflow**: user msgs + tool calls in order (last N) |
 | `--json` | Output as JSON (all commands) — pipe to `jq`/`toonq` |
 
 ## How to run
@@ -81,10 +85,12 @@ npx tsx pi-session.ts <args>
 ## When to use
 
 - User mentions another agent session — use `--find <text>` to locate it (matches project name or UUID)
-- User asks "what did the agent do?" — use `--last N` to see recent messages
+- User asks "what did the agent do?" — use `--last N` or **`--timeline`** to see the workflow in order
 - Debugging agent behavior — use `--summary` for overview, `--grep` for specifics
+- **"Why did the agent change X?"** — use **`--context N TEXT --role ROLE`** to see what was said around the change (replaces ad-hoc Python f-string scripts that always break on quotes-in-queries)
+- **"What tools does this session use?"** — use **`--tool-usage`** (add a regex to filter tool names, e.g. `--tool-usage chrome`)
 - Need to check what was discussed in a past session — `--find` + `--role user`
-- Need the session file path — `--list-sessions -v` shows full paths for copy-paste into inspection commands
+- Need the session file path — `--list-sessions -v` shows full paths for copy-pasting into inspection commands
 - **Searching across many sessions** — use `--grep-dir` (uses rg, fast) instead of looping with `--grep`
 - **Searching with role filter** — `--grep-dir DIR TEXT --role user` finds only user messages
 - Doing batch analysis — `--json` + pipe to `jq` or `toonq --from json` for filtering/aggregation
