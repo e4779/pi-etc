@@ -17,6 +17,9 @@ allowed-tools: bash read
 Drive a real Chrome tab through the `chrome-devtools` MCP via `mcporter call`.
 The top tools cover ~90% of real tasks; the rest loads on demand.
 
+See the [mcporter skill](../mcporter/SKILL.md) for mcporter basics (call syntax,
+daemon, config, output control).
+
 ## Prerequisites
 
 ```bash
@@ -25,15 +28,12 @@ mcporter call chrome-devtools.list_pages --output text    # prints a page → re
 ```
 
 Missing or broken? `read skills/chrome-devtools/references/setup.md` (inventory →
-repair → smoke test). If it was green but calls fail with `appears offline` /
-`Connection closed`, the tab crashed — restart and retry:
+repair → smoke test). If calls fail with `appears offline` / `Connection
+closed`, restart the daemon:
 
 ```bash
 mcporter daemon restart && sleep 3
 ```
-
-(If Chrome has many tabs open it may OOM-crash — close unneeded tabs, or point
-mcporter at a dedicated Chrome via `--browserUrl`; see recipes.md.)
 
 ## When to use
 

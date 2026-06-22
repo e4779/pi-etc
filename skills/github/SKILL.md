@@ -15,6 +15,9 @@ Drive GitHub through the `github` MCP via `mcporter call`. The top tools cover
 search, file reading, and issue tracking; write operations and the full surface
 load on demand from `references/`.
 
+See the [mcporter skill](../mcporter/SKILL.md) for mcporter basics (call syntax,
+config, output control).
+
 ## Prerequisites
 
 - **`mcporter` CLI** on PATH; `github` server configured in
@@ -69,16 +72,6 @@ mcporter call github.get_pull_request_files owner=oreilly-japan repo=rust-book p
 
 # File an issue
 mcporter call github.create_issue owner=owner repo=myrepo title="Bug: ..." body="..."
-```
-
-## Output is JSON
-
-Pipe to `jq`/`toonq` for filtering:
-
-```bash
-# Extract issue numbers+titles from list_issues output
-mcporter call github.list_issues owner=earendil-works repo=pi state=open | \
-  jq -r '.[] | "#\(.number): \(.title)"'
 ```
 
 ## When you need more

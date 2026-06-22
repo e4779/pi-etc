@@ -16,6 +16,9 @@ Four MCP servers behind `mcporter call`. The top two tools (search + reader)
 cover **87% of real use** (46% + 41% across ~2600 recorded calls); `zai-zread`
 and `zai-vision` load on demand from `references/`.
 
+See the [mcporter skill](../mcporter/SKILL.md) for mcporter basics (call syntax,
+config, output control).
+
 ## Prerequisites
 
 - **`mcporter` CLI** on PATH; four servers configured in `~/.mcporter/mcporter.json`:
@@ -24,7 +27,7 @@ and `zai-vision` load on demand from `references/`.
 - **No daemon, no Chrome** — unlike `chrome-devtools`, these are stateless
   HTTP/STDIO servers that connect on-demand per call. Nothing to start/restart.
 
-Verify they're reachable:
+Check tool names before calling:
 ```bash
 mcporter list zai-search  --brief   # → web_search_prime
 mcporter list zai-reader  --brief   # → webReader
