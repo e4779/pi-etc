@@ -36,6 +36,7 @@ pi install ~/dev/pi-etc -l
 | **layout-check** | `/skill:layout-check` | Верификация CSS-вёрстки через Chrome DevTools |
 | **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP (без раздувания контекста на 18k токенов) |
 | **zai-mcp** | `/skill:zai-mcp` | Веб-поиск, страница→markdown, семантическое чтение GitHub-репо, OCR/анализ изображений и видео через 4 Z.AI MCP сервера |
+| **lsp-cli** | `/skill:lsp-cli` | Семантическая навигация по коду через LSP из терминала (определения, ссылки, символы, диагностики). Поддерживает TypeScript, Python, Go, Rust, C/C++ и любой LSP-совместимый сервер. Альтернатива grep/rg |
 
 ### Утилиты (`tools/`, `bin/`)
 
@@ -56,7 +57,7 @@ pi install ~/dev/pi-etc -l
 ```json
 {
   "packages": [
-    "git:gitverse.ru/e4779/pi-etc"
+    "git:git@gitverse.ru:e4779/pi-etc.git"
   ]
 }
 ```
@@ -69,7 +70,7 @@ pi install ~/dev/pi-etc -l
 {
   "packages": [
     {
-      "source": "git:gitverse.ru/e4779/pi-etc",
+      "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "extensions": [
         "extensions/pi-way.ts",
         "extensions/qwen/index.ts"
@@ -85,7 +86,7 @@ pi install ~/dev/pi-etc -l
 {
   "packages": [
     {
-      "source": "git:gitverse.ru/e4779/pi-etc",
+      "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "extensions": []
     }
   ]
@@ -100,7 +101,7 @@ pi install ~/dev/pi-etc -l
 {
   "packages": [
     {
-      "source": "git:gitverse.ru/e4779/pi-etc",
+      "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "skills": [
         "layout-check",
         "deepthink"
@@ -116,7 +117,7 @@ pi install ~/dev/pi-etc -l
 {
   "packages": [
     {
-      "source": "git:gitverse.ru/e4779/pi-etc",
+      "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "extensions": [
         "extensions/pi-way.ts",
         "extensions/qwen/index.ts"
@@ -179,6 +180,8 @@ pi-etc/
 │   ├── chrome-devtools/
 │   │   ├── SKILL.md
 │   │   └── references/         # setup/tools/recipes — грузятся по требованию
+│   ├── lsp-cli/
+│   │   └── SKILL.md
 │   └── zai-mcp/
 │       ├── SKILL.md
 │       └── references/           # tools.md (13 tools) + recipes.md (7 сценариев)
