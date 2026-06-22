@@ -34,7 +34,7 @@ Then `rust-coder`, `mk-expert`, etc. are ordinary commands with tab-completion, 
 #!/bin/sh
 # rust-coder — Rust developer sub-agent. Usage: rust-coder <name> [pisub flags...]
 exec pisub spawn "$@" \
-  --model zai/glm-4.7 \
+  --model <provider>/<model> \
   --tools read,write,edit,bash \
   --system-prompt-file "$(dirname "$0")/rust-coder.prompt.md"
 ```
@@ -56,7 +56,7 @@ You are a pragmatic Rust developer. You write production-quality Rust code.
 rust-coder rc1                          # spawn named 'rc1' in current dir
 rust-coder rc1 --cwd ~/dev/foo          # work in a specific project
 rust-coder rc1 --tmux                   # wrap in tmux for live attach
-rust-coder rc1 --model deepseek/deepseek-v4-pro   # upgrade for hard task
+rust-coder rc1 --model <provider>/<model>   # upgrade for hard task
 rust-coder rc1 & rust-coder rc2 &       # two parallel workers
 ```
 

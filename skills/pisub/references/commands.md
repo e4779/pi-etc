@@ -33,7 +33,7 @@ pisub spawn <name> [--model M] [--provider P] [--cwd DIR] [--tools T]
                    [--thinking off|low|medium|high] [--session] [--tmux]
 ```
 
-- `--model` accepts `provider/model` shorthand, e.g. `zai/glm-5.2`, `deepseek/deepseek-v4-flash`. If you give `provider/model`, you can omit `--provider`.
+- `--model` accepts `provider/model` shorthand, e.g. `acme/llama-3`, `bigcorp/gpt-5`. If you give `provider/model`, you can omit `--provider`. Discover what's available: `jq '.providers | keys' ~/.pi/agent/models.json`.
 - `--tools` defaults to pi's builtin `read,write,edit,bash`. Restrict for safety (`read,bash`) or extend with mcporter/extension tools.
 - `--no-session` is the **default** — sub-agents are ephemeral. The pisub JSONL log is the durable record. Pass `--session` to also keep the pi session file in `~/.pi/agent/sessions/`.
 - `--tmux` wraps the daemon's output in a tmux session `pisub-<name>` so a human can `pisub attach <name>` and watch live.
@@ -42,8 +42,8 @@ pisub spawn <name> [--model M] [--provider P] [--cwd DIR] [--tools T]
 
 ```bash
 # Spawn two workers on the same project
-pisub spawn impl    --model deepseek/deepseek-v4-pro  --cwd ~/dev/proj --tools read,write,edit,bash
-pisub spawn review  --model zai/glm-5.2               --cwd ~/dev/proj --tools read,bash --tmux
+pisub spawn impl    --model <provider>/<model>  --cwd ~/dev/proj --tools read,write,edit,bash
+pisub spawn review  --model <provider>/<model>  --cwd ~/dev/proj --tools read,bash --tmux
 
 # Give them work
 pisub send impl    "Implement feature X in src/feature.ts. Write tests."

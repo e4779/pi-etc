@@ -1132,11 +1132,28 @@ async function cmdWait(args: string[]) {
 
   while (Date.now() < deadline) {
     let sawEnd = false;
+    let sawRetry = false;
+    let promptError: string | null = null;
     const newBytes = await streamJsonl(log, (evt: any) => {
       if (evt.type === "agent_end") sawEnd = true;
+      // `auto_retry_start` arrives AFTER `agent_end` when pi retries (e.g.
+      // empty assistant content). We must NOT exit on this agent_end — the
+      // real answer comes after the retry. Wait for the next agent_end.
+      if (evt.type === "auto_retry_start") sawRetry = true;
+      // A failed prompt (e.g. wrong provider/model, auth error) emits a
+      // `response` event with success=false and never reaches agent_end.
+      // Without this check, wait would hang until timeout.
+      if (evt.type === "response" && evt.success === false && evt.error) {
+        promptError = String(evt.error).split("\n")[0];
+      }
     }, { sinceBytes: currentBytes });
 
-    if (sawEnd) return;  // agent finished this run
+    if (promptError) {
+      throw new Error(`prompt rejected: ${promptError}`);
+    }
+    // agent_end is only final if no auto_retry_start followed it. If a retry
+    // started, keep waiting for the next agent_end.
+    if (sawEnd && !sawRetry) return;
 
     // Advance byte position for next poll
     currentBytes = newBytes;
@@ -1145,13 +1162,11 @@ async function cmdWait(args: string[]) {
     try {
       await withDaemon(name, async (c) => c.send({ type: "ping" }, 5000));
     } catch (e: any) {
-      console.error(`pisub: wait aborted — daemon for '${name}' is gone with no agent_end`);
-      process.exit(1);
+      throw new Error(`wait aborted — daemon for '${name}' is gone with no agent_end`);
     }
     await sleep(500);
   }
-  console.error(`pisub: wait timed out after ${timeoutSec}s`);
-  process.exit(1);
+  throw new Error(`wait timed out after ${timeoutSec}s`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1196,7 +1211,9 @@ async function cmdRun(args: string[]) {
   try {
     // send the prompt
     await sendQueued(name, prompt, flags.includes("--steer"), flags.includes("--follow-up"));
-    // wait for idle (with optional timeout)
+    // wait for idle (with optional timeout). Throws on timeout, daemon death,
+    // or prompt rejection (e.g. wrong provider/model — the error text from
+    // the `response success=false` event is in the message).
     await cmdWait([name, ...(timeoutSec > 0 ? ["--timeout", String(timeoutSec)] : [])]);
     // print the final report (full text, not truncated)
     await cmdReport([name]);
@@ -1522,6 +1539,15 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(`pisub: ${e.stack ?? e.message ?? e}`);
+  // User-facing errors (prompt rejected, timeout, daemon gone) should print
+  // a clean message, not a stack trace. Programmer errors (bugs) still get
+  // the full stack for debugging.
+  const msg = e.message ?? String(e);
+  const isUserError = /^(prompt rejected:|wait timed out|wait aborted)/.test(msg);
+  if (isUserError) {
+    console.error(`pisub: ${msg}`);
+  } else {
+    console.error(`pisub: ${e.stack ?? msg}`);
+  }
   process.exit(1);
 });

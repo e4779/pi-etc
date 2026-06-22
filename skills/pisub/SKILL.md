@@ -19,9 +19,16 @@ Pi's philosophy (and the blog post that inspired pi-way) says: *"if you need pi 
 
 ## Workflow: spawn → send → steer → observe → kill
 
+**Discover available providers/models first** — they vary per machine:
+```bash
+cat ~/.pi/agent/models.json | jq '.providers | keys'   # list providers
+```
+Pass `--model <provider>/<model>` to `pisub spawn`. If you see `No API key
+found for <provider>`, the name is wrong or not configured on this machine.
+
 ```bash
 # 1. SPAWN a live agent (daemonized, stays running)
-pisub spawn researcher --model deepseek/deepseek-v4-flash --cwd ~/dev/proj --tools read,bash
+pisub spawn researcher --model <provider>/<model> --cwd ~/dev/proj --tools read,bash
 
 # 2. SEND a task
 pisub send researcher "Summarize src/auth/ in 5 bullets."
@@ -91,7 +98,7 @@ point to a `.prompt.md` for custom roles. Details: [profiles](references/profile
 For fire-and-forget tasks (the most common delegation pattern), use `run`. It composes the existing primitives:
 
 ```bash
-pisub run reviewer "review src/auth/ for bugs" --model zai/glm-5.2 --cwd ~/dev/proj
+pisub run reviewer "review src/auth/ for bugs" --model <provider>/<model> --cwd ~/dev/proj
 # = spawn + send + wait + report + kill, in one call
 ```
 
@@ -100,7 +107,7 @@ The daemon still runs as a real long-lived agent while `run` blocks — you can 
 If you want to compose manually (e.g. to inspect intermediate state):
 
 ```bash
-pisub spawn rc1 --model deepseek/deepseek-v4-pro --cwd ~/dev/proj
+pisub spawn rc1 --model <provider>/<model> --cwd ~/dev/proj
 pisub send rc1 "implement feature X"
 pisub wait rc1 && pisub report rc1
 pisub kill rc1
