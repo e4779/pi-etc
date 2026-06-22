@@ -130,4 +130,4 @@ pisub kill rc1
 - [Pitfalls & integrations](references/pitfalls.md) — common gotchas, toonq/jq pipelines
 - [pi RPC mode docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc.md) — the protocol pisub wraps
 - [Mario Zechner: "No sub-agents"](https://mariozechner.at/posts/2025-11-30-pi-coding-agent/) — the philosophy
-- [`pi-session` skill](../pi-session/SKILL.md) — inspect pi session JSONL files (works on pisub logs too, same format family)
+- [`pi-session` skill](../pi-session/SKILL.md) — inspect pi agent session JSONL files (NOT pisub logs; pisub logs use a different format — inspect those with `rg`/`jq`, see [Log format & inspection](#log-format--inspection) above)

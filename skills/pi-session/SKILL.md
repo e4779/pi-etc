@@ -6,14 +6,16 @@ description: "Parse and inspect pi agent session JSONL files. Commands: --summar
 **Scope:** pi-session inspects **pi agent sessions** only — files in
 `~/.pi/agent/sessions/`. It does NOT read pisub RPC logs
 (`~/.pisub/agents/*.log`); those use a different schema and running
-pi-session on them would truncate the file. For pisub logs use
-`pisub log <name>`, `pisub report <name>`, or `pisub grep <name> <text>`.
+pi-session on them would truncate the file. For pisub logs use `pisub log
+<name>`, `pisub report <name>`, or inspect the NDJSON directly with
+`rg`/`jq` (see pisub SKILL.md "Log format & inspection").
 
 The `pi-session` tool parses pi agent session JSONL files using the pi agent SDK — always in sync with pi's format.
 
 Sessions live in `~/.pi/agent/sessions/<project>/`.
 
-**Binary:** `npx tsx pi-session.ts` (TypeScript, uses pi agent SDK — always in sync with pi's format)
+**Binary:** `pi-session` (on PATH → wraps `npx tsx tools/pi-session.ts`).
+If `pi-session` is not on PATH, run `npx tsx /path/to/pi-etc/tools/pi-session.ts` with `PI_SDK_PATH` pointing to the pi SDK install.
 
 **Uses `rg` (ripgrep)** for fast cross-session search when available. Falls back to SDK-based search for single-file `--grep`.
 
@@ -82,10 +84,17 @@ pi-session --grep-dir ~/.pi/agent/sessions/--proj-- "bug" --json | toonq --from 
 
 ## How to run
 
-From the skill directory:
+`pi-session` is on PATH (wraps `npx tsx tools/pi-session.ts`). Just call it directly:
 
 ```bash
-npx tsx pi-session.ts <args>
+pi-session --list
+pi-session <path.jsonl> --summary
+```
+
+If `which pi-session` returns nothing, the wrapper is missing — run the tool directly:
+```bash
+PI_SDK_PATH=/home/e41q/.nvm/versions/node/v24.13.1/lib/node_modules/@earendil-works/pi-coding-agent \
+  npx tsx /home/e41q/dev/pi-etc/tools/pi-session.ts <args>
 ```
 
 ## When to use
