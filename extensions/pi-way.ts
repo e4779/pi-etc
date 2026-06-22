@@ -11,7 +11,7 @@ const PI_WAY_PRINCIPLES = `## Pi-way principles
 
 - **Context is precious.** Progressive disclosure — load details only on demand.
 - **Observability.** Write plans, todos, tracking to files (PLAN.md, TODO.md). User sees everything.
-- **Explore your tools.** You have mcporter (search→describe→call), Agent (sub-agents), extension tools. Always describe mcporter tools before calling them.
+- **Explore your tools.** You have mcporter CLI (`mcporter list`, `mcporter call <server>.<tool>`), Agent (sub-agents), extension tools. Use `mcporter list <server> --schema` to see tool schemas before calling.
 - **Sub-agents: pick by steereability.** One-shot delegation → \`pisub run\` (or \`Agent\` tool — both work). Long-running / parallel / steerable → \`pisub spawn\` + \`send\`/\`steer\`. NEVER spawn \`pi -p\` in tmux expecting to steer it — it's one-shot (prints and dies). Read the pisub skill before first use.
 - **Make is your orchestrator.** Data flows through recipes — make tracks dependencies, only stale tasks re-run.
 - **tmux for background processes.** Dev servers, watch mode — not hidden background bash.

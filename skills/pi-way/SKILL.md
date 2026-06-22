@@ -26,12 +26,12 @@ Inspiration: [Mario Zechner's blog](https://mariozechner.at/posts/2025-11-30-pi-
 
 You have more than just read/write/edit/bash. Before you start working, understand what's available:
 
-- **`mcporter`** — MCP servers behind progressive disclosure. ALWAYS search → describe → call. Never call without describing the schema first. Explore all available servers.
+- **`mcporter`** — MCP servers behind progressive disclosure. Use `mcporter list` to see servers, `mcporter list <server> --schema` to see tool schemas, `mcporter call <server>.<tool> key=value` to execute. Explore all available servers.
 - **`Agent`** — Alternative one-shot sub-agent delegation (@tintinweb/pi-subagents) when you want inline results. For most cases prefer `pisub`.
 - **`pisub`** — Live, steerable sub-agents via tmux + RPC. Use for long-running, parallel, or interactive work. Read the `pisub` skill before first use.
-- **Extension tools** — mcporter bridge, powershell utilities, and others. They're in your tool list — read their descriptions.
+- **Extension tools** — powershell utilities and others. They're in your tool list — read their descriptions.
 
-**Rule**: before using any mcporter tool for the first time, call `describe` to get its schema.
+**Rule**: before using any mcporter server for the first time, run `mcporter list <server> --schema` to see its tools.
 
 ---
 
@@ -159,7 +159,7 @@ Experiments, parallel explorations, review→fix — all isolated via filesystem
 | Sub-agent (one-shot or steerable) | `pisub` (run for one-shot, spawn+send+steer for interactive) |
 | Inline one-shot result (no log) | `Agent` tool + agent `.md` files |
 | Orchestration | Make — data flows through recipes (lenses) |
-| External tool | mcporter (describe first!), CLI + README |
+| External tool | mcporter CLI (`mcporter list <s> --schema` first!), CLI + README |
 | Planning | `PLAN.md` |
 | Task tracking | `TODO.md` |
 | Background process | `tmux` |
