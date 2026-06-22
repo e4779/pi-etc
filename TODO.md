@@ -130,9 +130,39 @@ just a bug report. Don't over-engineer.
   can be a one-line "heads up" issue instead of a fix-request.
 
 **Steps:**
-- [ ] Read `SessionManager.open` source in pi SDK, confirm behavior + check for any documented contract
-- [ ] Decide: bug report vs heads-up issue vs skip
-- [ ] If filing: draft issue text in `docs/upstream-issue-draft.md`, review, submit
+- [x] Read `SessionManager.open` source in pi SDK, confirm behavior + check for any documented contract
+- [x] Search existing issues for prior reports (github.list_issues + github.search_issues + zai-zread.search_doc)
+- [x] Decide: **file a bug report** — the fix for #932 over-truncates non-session files
+- [ ] Draft issue text in `docs/upstream-issue-draft.md`
+- [ ] Review draft, submit to earendil-works/pi
+
+### Findings (2026-06-21)
+
+**Root cause confirmed in source** (`dist/core/session-manager.js`, `setSessionFile` ~line 532):
+
+```js
+// If file was empty or corrupted (no valid header), truncate and start fresh
+// to avoid appending messages without a session header (which breaks the session)
+if (this.fileEntries.length === 0) {
+    const explicitPath = this.sessionFile;
+    this.newSession();           // creates new session header
+    this.sessionFile = explicitPath;
+    this._rewriteFile();         // TRUNCATES file, writes header
+    this.flushed = true;
+    return;
+}
+```
+
+`SessionManager.open(path)` → constructor → `setSessionFile()` → `loadEntriesFromFile()`. That loader returns `[]` for **any** file without a valid `type:"session"` header — including non-session files (pisub NDJSON logs, arbitrary JSONL, empty files). The #932 fix then truncates and rewrites them as a fresh session. **3 pisub logs destroyed this way** (wiki-glm5.log 3.2MB→133B, wiki-maintainer.log, giga-test.log).
+
+**Prior issues search (2026-06-21):**
+- `github.search_issues` "SessionManager" (83 results), "truncate session" (55), "corrupt session file" (11), "open non-session" (3) — **none** describe `open()`/`setSessionFile()` truncating non-session files.
+- Closest: **#932** "SessionManager.setSessionFile() corrupts session when loading empty/invalid file" (Jan 2026, closed/completed) — this is the issue the over-truncating fix was written for. Same method, different symptom: #932 was about *appending without a header*; the fix introduced *truncating non-session files*.
+- `zai-zread.search_doc` returned only general docs, no issue matches.
+
+**Decision: file a bug report.** The issue is real (silent irreversible data loss on the first `open()` call), reproducible, and not a duplicate. Framing: the #932 fix is correct for its case (corrupted session files) but over-broad — `loadEntriesFromFile() === []` is treated as "corrupted session" when it also means "not a session file at all". Suggested fix: refuse to open (throw) when the file exists but has no session header AND was not just created, rather than silently truncating. Or at minimum, back up the original file before rewriting.
+
+Our Track B (pi-session refuses pisub logs by content) is the local mitigation; the upstream fix would protect all callers, not just our tool.
 
 ---
 
