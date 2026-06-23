@@ -133,8 +133,9 @@ just a bug report. Don't over-engineer.
 - [x] Read `SessionManager.open` source in pi SDK, confirm behavior + check for any documented contract
 - [x] Search existing issues for prior reports (github.list_issues + github.search_issues + zai-zread.search_doc)
 - [x] Decide: **file a bug report** — the fix for #932 over-truncates non-session files
-- [ ] Draft issue text in `docs/upstream-issue-draft.md`
-- [ ] Review draft, submit to earendil-works/pi
+- [x] Draft issue text in `docs/upstream-issue-draft.md` (v2, aligned with CONTRIBUTING + bug.yml template)
+- [x] Submit to earendil-works/pi → **#6002** (auto-closed not_planned, labels: bug+untriaged — expected for new contributor per CONTRIBUTING)
+- [ ] Wait for maintainer triage (daily review; reopen if worthwhile)
 
 ### Findings (2026-06-21)
 
@@ -163,6 +164,14 @@ if (this.fileEntries.length === 0) {
 **Decision: file a bug report.** The issue is real (silent irreversible data loss on the first `open()` call), reproducible, and not a duplicate. Framing: the #932 fix is correct for its case (corrupted session files) but over-broad — `loadEntriesFromFile() === []` is treated as "corrupted session" when it also means "not a session file at all". Suggested fix: refuse to open (throw) when the file exists but has no session header AND was not just created, rather than silently truncating. Or at minimum, back up the original file before rewriting.
 
 Our Track B (pi-session refuses pisub logs by content) is the local mitigation; the upstream fix would protect all callers, not just our tool.
+
+### Submission (2026-06-23)
+
+- Issue filed: https://github.com/earendil-works/pi/issues/6002
+- Title: `SessionManager.open()` silently truncates non-session files
+- Body: 4-field bug report template (What happened / Steps to reproduce / Expected behavior / Version), ~35 lines, fits one screen per CONTRIBUTING.
+- State: auto-closed `not_planned` with labels `bug`, `untriaged` — expected for new contributors per CONTRIBUTING ("All issues and PRs from new contributors are auto-closed by default"). Maintainers review daily and reopen worthwhile ones.
+- No AI-specific label exists in the repo (28 labels total, none AI/agent-related). Per CONTRIBUTING ("if you must [use an LLM], follow up with a clearly AI labeled comment"), the submitter should add a comment disclosing AI assistance — but only after the issue is reopened (commenting on an auto-closed issue adds noise without benefit).
 
 
 
