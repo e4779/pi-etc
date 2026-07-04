@@ -115,6 +115,12 @@ Set `maxConsecutiveFailures: 0` to disable.
 - Project must have `.nano-staged.json` (or one of nano-staged's config formats)
 - Required linters/tools must be available (`npx oxlint`, `npx tsc`, etc.)
 
+> **Robustness:** `nano-staged` is loaded with a guarded `require`. If the
+> package is missing for any reason, the extension still loads — pi will not
+> crash — and silently skips the post-turn lint run (only the `--no-verify`
+> stripping remains active). Install via `npm install nano-staged` in the
+> pi-etc package directory to enable lint runs.
+
 ## Inspiration
 
 - [Evil Martians: Stop writing rules in AGENTS.md](https://evilmartians.com/chronicles/stop-writing-rules-in-agents-md-use-agent-hooks-and-nano-staged-instead)

@@ -9,7 +9,20 @@ import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-a
 import { isEditToolResult, isToolCallEventType, isWriteToolResult } from '@earendil-works/pi-coding-agent';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import nanoStaged from 'nano-staged';
+
+// nano-staged is an optional runtime dependency. The extension's core purpose
+// (strip --no-verify, track modified files) still works without it; only the
+// post-turn lint run is skipped. Use a guarded require so a missing package
+// never crashes pi at extension load time — a top-level `import` would abort
+// the whole agent. Resolved once at module init.
+let nanoStaged: ((opts?: unknown) => Promise<unknown>) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  nanoStaged = require('nano-staged');
+} catch {
+  nanoStaged = null;
+}
+let nanoStagedMissingWarned = false;
 
 // ===========================================================================
 // Core: Config
@@ -78,6 +91,17 @@ async function runNanoStaged(
   cwd: string,
   config?: { nanoStagedConfig?: string },
 ): Promise<string[]> {
+  if (!nanoStaged) {
+    // Warn once per session so the user knows linting is disabled, then stay
+    // quiet — silent no-op afterwards. Install hint in the message.
+    if (!nanoStagedMissingWarned) {
+      nanoStagedMissingWarned = true;
+      console.error(
+        'lint-check: nano-staged not installed — run `npm install nano-staged` in the pi-etc package to enable lint runs. Extension is otherwise active (--no-verify stripping still works).',
+      );
+    }
+    return [];
+  }
   try {
     await nanoStaged({
       cwd,
