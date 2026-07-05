@@ -111,9 +111,24 @@ async function runNanoStaged(
     }
     return [];
   }
+  // Bail before calling nano-staged when there is no config to find. nano-staged's
+  // own reporter prints 'Create Nano Staged config.' to its stream on the noConfig
+  // path, and `quiet: true` does NOT suppress that — pi picks it up from stderr
+  // and renders it as a (loud, red) error in the TUI. This is the common case:
+  // the agent edits files in many repos, only some of which have lint config.
+  const configPath = config?.nanoStagedConfig
+    ? resolve(cwd, config.nanoStagedConfig)
+    : join(cwd, '.nano-staged.json');
+  if (!fs.existsSync(configPath)) {
+    return [];
+  }
   try {
     await nanoStaged({
       cwd,
+      // Swallow nano-staged's own reporter output. We surface errors via
+      // notify() ourselves using the thrown value; the reporter's stderr
+      // print duplicates the message and pi renders it as a second input box.
+      stream: { write: () => {} } as unknown as NodeJS.WriteStream,
       unstaged: true,
       quiet: true,
       config: config?.nanoStagedConfig,
