@@ -152,10 +152,6 @@ If the same error keeps coming back, the gate will suppress after
 
 ## Configuration reference
 
----
-
-## Configuration reference
-
 ### `.nano-staged.json` (project-level, required)
 
 Maps glob patterns to commands. nano-staged **appends matched filenames** to
@@ -320,6 +316,16 @@ there because it governs both the toast and the followUp gate together.
 
 ## Inspiration
 
-- [Evil Martians: Stop writing rules in AGENTS.md](https://evilmartians.com/chronicles/stop-writing-rules-in-agents-md-use-agent-hooks-and-nano-staged-instead)
-- Architecture from [@prateekmedia/pi-hooks](https://github.com/prateekmedia/pi-hooks)
-- Powered by [nano-staged](https://github.com/usmanyunusov/nano-staged)
+The design follows Andrey Sitnik's [Stop writing rules in AGENTS.md](https://evilmartians.com/chronicles/stop-writing-rules-in-agents-md-use-agent-hooks-and-nano-staged-instead)
+article. Two offline readings ship in `references/` for context:
+
+- **`references/background.md`** — our wiki synthesis (shorter, with our own
+  commentary on how the pattern maps to this extension).
+- **`references/evil-martians-article.md`** — the original article, fetched
+  verbatim for primary-source reference.
+
+Read these to understand *why* lint-check feeds errors back to the agent
+rather than just showing them to the human.
+
+Architecture borrowed from [@prateekmedia/pi-hooks](https://github.com/prateekmedia/pi-hooks)
+(core/hook split). Powered by [nano-staged](https://github.com/usmanyunusov/nano-staged).
