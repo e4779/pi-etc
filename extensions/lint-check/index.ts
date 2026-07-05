@@ -8,7 +8,9 @@
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { isEditToolResult, isToolCallEventType, isWriteToolResult } from '@earendil-works/pi-coding-agent';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 // nano-staged is an optional runtime dependency. The extension's core purpose
 // (strip --no-verify, track modified files) still works without it; only the
@@ -268,6 +270,41 @@ async function resetConfig(ctx: ExtensionContext): Promise<void> {
 // Extension entry point
 // ===========================================================================
 
+// Resolve the working directory nano-staged should run from, given the set
+// of files an agent just modified. Walks up from each file's directory until
+// it finds a project root marker (.nano-staged.json preferred, then .git) and
+// returns the first match. If files disagree or no marker is found, falls
+// back to ctx.cwd. This lets the extension work when pi is launched from a
+// parent or sibling directory of the actual project (e.g. editing ~/wiki
+// files while pi runs in ~/dev/research-llm-wiki).
+function resolveProjectCwd(
+  files: string[],
+  fallbackCwd?: string,
+): string {
+  const seenRoots = new Set<string>();
+  for (const f of files) {
+    let dir = path.dirname(path.resolve(f));
+    while (true) {
+      const nanoStaged = path.join(dir, '.nano-staged.json');
+      const gitDir = path.join(dir, '.git');
+      if (fs.existsSync(nanoStaged)) {
+        seenRoots.add(dir);
+        break;
+      }
+      if (fs.existsSync(gitDir)) {
+        seenRoots.add(dir);
+        break;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break; // filesystem root
+      dir = parent;
+    }
+  }
+  if (seenRoots.size === 1) return [...seenRoots][0];
+  // No agreement or no marker — fall back to provided cwd.
+  return fallbackCwd ?? process.cwd();
+}
+
 export default function (pi: ExtensionAPI) {
   let modifiedFiles: Set<string> = new Set();
   let enabled: boolean = true;
@@ -313,7 +350,13 @@ export default function (pi: ExtensionAPI) {
 
     ctx.ui.setStatus('lint-check', `${DIM}lint-check running...${RESET}`);
 
-    runNanoStaged(ctx.cwd, config)
+    // Derive project root from modified files: find the nearest ancestor
+    // containing .nano-staged.json or .git. Falls back to ctx.cwd.
+    // Without this, nano-staged runs from the pi session cwd (which may be a
+    // different repo entirely) and fails with "Create Nano Staged config."
+    const projectCwd = resolveProjectCwd(files, config?.nanoStagedConfig);
+
+    runNanoStaged(projectCwd, config)
       .then((rawErrors) => {
         const ignored = config.ignoreErrors ?? [];
         const errors = filterErrors(rawErrors, ignored);
