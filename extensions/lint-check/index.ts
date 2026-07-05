@@ -412,6 +412,32 @@ export default function (pi: ExtensionAPI) {
               : `lint-check: ${errors.length} errors — run /lint-check for details`;
           ctx.ui.notify(hint, 'error');
           ctx.ui.setStatus('lint-check', `${RED}lint-check ✗${RESET}`);
+
+          // MANDATORY GATE — feed the errors back to the agent as a followup
+          // user message. This is the whole point of lint-check: not just to
+          // show the human, but to close the loop so the agent self-corrects
+          // (the Stop-hook + exit 2 pattern from Evil Martians' nano-staged
+          // article). The agent receives this after its current turn ends and
+          // must address it before the work is considered done.
+          //
+          // Anti-loop: when consecutiveFailures crosses maxFailures, the gate
+          // stops firing (the suppression branch above returns early). The
+          // human can raise maxFailures or fix the underlying issue manually.
+          const fileList = files.map((f) => f.replace(/^[^/]+\/[/^/]+\//, '')).join(', ');
+          const agentMessage = [
+            `lint-check found ${errors.length === 1 ? 'an error' : `${errors.length} errors`} after your recent edits to: ${fileList}`,
+            '',
+            ...errors.map((e) => `  • ${e}`),
+            '',
+            'Fix the failing files so the linter passes. Re-run the linter yourself to confirm.',
+          ].join('\n');
+          try {
+            pi.sendUserMessage(agentMessage, { deliverAs: 'followUp' });
+          } catch (e: any) {
+            // sendUserMessage can throw if the session is shutting down or
+            // in non-interactive modes. Don't let that crash the extension.
+            console.error('lint-check: failed to send followUp to agent:', e?.message);
+          }
         } else {
           consecutiveFailures = 0;
           lastErrorFingerprint = '';
