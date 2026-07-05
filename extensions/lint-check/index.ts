@@ -18,7 +18,14 @@ import { join } from 'node:path';
 let nanoStaged: ((opts?: unknown) => Promise<unknown>) | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  nanoStaged = require('nano-staged');
+  // nano-staged is ESM-only (type: module); require() returns { default: fn },
+  // so unwrap the .default or fall back to the module itself (CJS-compat builds).
+  const required = require('nano-staged');
+  nanoStaged = (typeof required === 'function'
+    ? required
+    : required?.default ?? null) as
+    | ((opts?: unknown) => Promise<unknown>)
+    | null;
 } catch {
   nanoStaged = null;
 }
