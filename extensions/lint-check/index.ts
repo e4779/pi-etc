@@ -277,6 +277,10 @@ async function resetConfig(ctx: ExtensionContext): Promise<void> {
 // back to ctx.cwd. This lets the extension work when pi is launched from a
 // parent or sibling directory of the actual project (e.g. editing ~/wiki
 // files while pi runs in ~/dev/research-llm-wiki).
+function truncate(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
 function resolveProjectCwd(
   files: string[],
   fallbackCwd?: string,
@@ -312,6 +316,10 @@ export default function (pi: ExtensionAPI) {
   // Anti-loop protection
   let consecutiveFailures = 0;
   let lastErrorFingerprint = '';
+
+  // Last error details, surfaced via /lint-check → "View last errors".
+  // Kept out of the toast so the notify() stays a single-line hint.
+  let lastErrors: string[] = [];
 
   // ── 1. Strip --no-verify from git commit ─────────────────────────────────
   pi.on('tool_call', async (event, _ctx) => {
@@ -378,20 +386,21 @@ export default function (pi: ExtensionAPI) {
             return;
           }
 
-          // Single source of truth: notify with the actual error text, plus a
-          // footer ✗ indicator. We deliberately do NOT use setWidget() here —
-          // its default placement ("aboveEditor") overlays the input field,
-          // which makes the error look like part of the user's prompt.
-          // The toast already shows the full text; the footer tracks state.
-          const summary =
+          // Single source of truth: a SHORT toast (one line so pi renders it
+          // as a compact notification, not a tall box that looks like a second
+          // input field) plus a footer ✗. Full error text stored in lastErrors
+          // and surfaced via /lint-check → "View last errors" on demand.
+          lastErrors = errors;
+          const hint =
             errors.length === 1
-              ? `lint-check: ${errors[0]}`
-              : `lint-check: ${errors.length} errors\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n…(+${errors.length - 5} more)` : ''}`;
-          ctx.ui.notify(summary, 'error');
+              ? `lint-check: ${truncate(errors[0], 80)}`
+              : `lint-check: ${errors.length} errors — run /lint-check for details`;
+          ctx.ui.notify(hint, 'error');
           ctx.ui.setStatus('lint-check', `${RED}lint-check ✗${RESET}`);
         } else {
           consecutiveFailures = 0;
           lastErrorFingerprint = '';
+          lastErrors = [];
           ctx.ui.setStatus('lint-check', getStatusText(enabled));
         }
       })
@@ -428,6 +437,9 @@ export default function (pi: ExtensionAPI) {
 
       options.push('View current config');
       options.push('Manage ignored errors');
+      if (lastErrors.length > 0) {
+        options.push(`View last errors (${lastErrors.length})`);
+      }
 
       if (userExists || projectExists) {
         options.push('Reset config to defaults');
@@ -444,7 +456,7 @@ export default function (pi: ExtensionAPI) {
         enabled = true;
         setStatus?.('lint-check', getStatusText(enabled));
         ctx.ui.notify('lint-check enabled', 'info');
-      } else if (choice.includes('View')) {
+      } else if (choice.includes('View current config')) {
         const lines: string[] = [];
         lines.push('lint-check config:');
         lines.push(`  enabled (session): ${enabled}`);
@@ -458,6 +470,9 @@ export default function (pi: ExtensionAPI) {
         if (userExists) lines.push(`  user config: ${userPath}`);
         if (projectExists) lines.push(`  project config: ${projectPath}`);
         ctx.ui.notify(lines.join('\n'), 'info');
+      } else if (choice.includes('View last errors')) {
+        const lines = ['lint-check — last errors:', '', ...lastErrors];
+        ctx.ui.notify(lines.join('\n'), 'error');
       } else if (choice.includes('Manage')) {
         await manageIgnoredErrors(ctx, config);
       } else if (choice.includes('Reset')) {
