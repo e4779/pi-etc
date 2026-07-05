@@ -105,6 +105,53 @@ runs asynchronously. The `tool_call` hook additionally strips `--no-verify`
 from any `git commit` command the agent issues (defence-in-depth against the
 agent circumventing pre-commit hooks).
 
+## Mandatory gate — agent self-correction
+
+This is the whole point of the extension, and the bit that's easy to miss:
+**on failure, lint-check feeds the error text back to the agent as a followup
+user message** via `pi.sendUserMessage(text, { deliverAs: 'followUp' })`.
+
+The agent receives the message right after its current turn ends, sees the
+exact errors, and is expected to fix them and re-verify. This closes the loop
+`agent edits → linter fails → agent sees failure → agent self-corrects`,
+without the human having to copy-paste TUI output back into the chat.
+
+This is the pi-extension-API equivalent of the Claude Code **Stop hook + `exit
+2`** pattern from the Evil Martians article (see `references/`). Until this
+was wired up, the extension only showed the human — the agent could quietly
+declare work done while the linter was still failing.
+
+### Anti-loop protection
+
+If nano-staged returns the **same errors** on consecutive agent turns, the
+extension assumes the agent can't fix them. After `maxConsecutiveFailures`
+identical failures (default 3):
+
+- the toast is suppressed,
+- the gate stops firing (no followUp message),
+- the footer reads `lint-check (suppressed — same errors 3×)` (yellow).
+
+The protection resets when the agent response has no lint errors, or when the
+error output changes (different errors). Set `maxConsecutiveFailures: 0` to
+disable.
+
+### Contract for the agent
+
+When a followUp arrives titled `lint-check found N errors after your recent
+edits to: <files>`:
+
+1. Read the bullet list of errors.
+2. Fix the failing files.
+3. Re-run the linter yourself (`okf fmt -w <file>`, `prettier --write`,
+   whatever's configured) to confirm it passes.
+4. Only then consider the work done.
+
+If the same error keeps coming back, the gate will suppress after
+`maxConsecutiveFailures` rounds — at that point the human needs to intervene
+(the error is beyond the agent's current ability to fix).
+
+## Configuration reference
+
 ---
 
 ## Configuration reference
@@ -217,15 +264,8 @@ last errors`.
 
 ### Anti-loop protection
 
-If nano-staged returns the **same errors** on consecutive agent turns, the
-extension assumes the agent can't fix them. After `maxConsecutiveFailures`
-identical failures (default 3), the toast is suppressed and the footer reads
-`(suppressed — same errors 3×)`. The protection resets when:
-
-- the agent response has no lint errors, **or**
-- the error output changes (different errors)
-
-Set `maxConsecutiveFailures: 0` to disable.
+See "Mandatory gate — agent self-correction" above; anti-loop is described
+there because it governs both the toast and the followUp gate together.
 
 ---
 
