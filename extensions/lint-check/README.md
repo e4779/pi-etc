@@ -1,76 +1,139 @@
 # lint-check extension
 
-This extension runs project linters (via [nano-staged](https://github.com/usmanyunusov/nano-staged)) on changed files after each agent response.
+Runs project linters/formatters on changed files after each agent response, and
+blocks `git commit --no-verify` so pre-commit hooks stay active. Built on
+[nano-staged](https://github.com/usmanyunusov/nano-staged).
 
-## What it does
+This is what closes the loop "agent edits → linter normalises → agent sees
+errors and self-corrects" without leaving the pi TUI.
 
-1. **Runs project linters** — uses the project's `.nano-staged.json` config to lint/format/typecheck changed files
-2. **Blocks `git commit --no-verify`** — silently strips the `--no-verify` flag to keep pre-commit hooks active
-3. **Shows errors in UI widget** — lint/typecheck errors appear in the pi TUI for the agent to self-correct
-4. **Anti-loop protection** — suppresses errors after N consecutive identical failures (default: 3)
-5. **`/lint-check` command** — interactive settings (toggle, config, ignored errors, reset)
+---
 
-## How it works
+## Quickstart (fresh machine)
 
-### Hooks used
+These are the steps a smaller model (Qwen 3.6-class) can follow on a clean
+install. Assumes [pi](https://github.com/earendil-works/pi-coding-agent) is
+already installed.
 
-| Hook | Purpose |
-|---|---|
-| `tool_call` | Strips `--no-verify` from `git commit` commands (no blocking) |
-| `tool_result` | Tracks files modified by `edit` and `write` tools |
-| `agent_end` | Runs `nano-staged --unstaged` on changed files (async, non-blocking) |
+### 1. Install the extension
 
-### Flow
+The extension ships in the [pi-etc](https://gitverse.ru/e4779/pi-etc) package:
 
-The extension uses your project's **`.nano-staged.json`** — the same config you'd use for pre-commit hooks. One config, two consumers:
-
-```
-                    ┌─ pre-commit hook (husky)
-                    │
-.nano-staged.json ──┤
-                    │
-                    └─ pi-lint-check (agent_end)
+```bash
+pi install git:git@gitverse.ru:e4779/pi-etc.git
 ```
 
-At `agent_end`, the extension calls nano-staged's JS API with `unstaged: true`:
-- Finds all unstaged (changed but not staged) files via `git status -z`
-- Matches them against glob patterns in `.nano-staged.json`
-- Runs the configured commands (in parallel per glob group)
-- Returns errors from failed commands
+This clones pi-etc into `~/.pi/agent/git/gitverse.ru/e4779/pi-etc/` and runs
+`npm install` (which picks up `nano-staged` as a dependency).
 
-This means you can use **any linter** (oxlint, biome, eslint, clippy, etc.) for **any file type** — just configure it in `.nano-staged.json`.
+### 2. Activate the extension in pi
 
-### Example `.nano-staged.json`
+`pi install` adds pi-etc to your settings, but the lint-check extension itself
+must be enabled explicitly (pi-etc ships several extensions; not all are on by
+default). Either:
+
+- run `pi config` and toggle `[x]` on `lint-check/index.ts` under pi-etc, **or**
+- edit `~/.pi/agent/settings.json` and add the extension to the pi-etc entry:
+
+```jsonc
+{
+  "source": "git:git@gitverse.ru:e4779/pi-etc.git",
+  "extensions": [
+    "extensions/pi-way.ts",
+    "extensions/lint-check/index.ts"   // ← add this line
+  ],
+  // ...skills etc.
+}
+```
+
+Restart pi.
+
+### 3. Verify it loaded
+
+`/lint-check` command should be available. Run it; you should see:
+
+```
+lint-check config:
+   enabled (session): true
+   ignoreErrors: []
+   maxConsecutiveFailures: 3
+   nanoStagedConfig: auto (project .nano-staged.json)
+```
+
+### 4. Add `.nano-staged.json` to your project
+
+In the **project root** (the directory containing `.git`):
 
 ```json
 {
-  "*.{js,ts,tsx}": ["oxlint --fix", "tsc --noEmit"],
-  "*.css": "stylelint --fix",
-  "*.{json,md,yaml}": "prettier --write",
+  "**/*.rs": "rustfmt --edition 2021",
+  "**/*.{js,ts}": "prettier --write",
+  "**/*.py": "ruff check --fix"
+}
+```
+
+That's it. The next time the agent edits a file in this project, pi runs the
+matching command at `agent_end` and surfaces failures in the TUI.
+
+---
+
+## How it works
+
+```
+                    ┌─ pre-commit hook (husky / nano-staged CLI)
+                    │
+.nano-staged.json ──┤
+                    │
+                    └─ pi lint-check (agent_end, via nano-staged JS API)
+```
+
+At `agent_end`:
+
+1. Collect files modified via `edit`/`write` tools during this turn.
+2. Resolve the project root by walking up from each modified file until a
+   `.nano-staged.json` or `.git` is found. **This is independent of pi's
+   `cwd`** — pi can be launched from a sibling/parent directory.
+3. Call `nanoStaged({ cwd: projectRoot, unstaged: true, quiet: true })`.
+4. nano-staged matches unstaged files against the glob keys, runs the commands,
+   collects stdout/stderr.
+5. On failure: a compact one-line `notify()` toast + `lint-check ✗` in the
+   footer. Full text stored and accessible via `/lint-check → View last errors`.
+6. On success: footer stays green, no toast.
+
+The extension is **non-blocking** — agent output is shown immediately; lint
+runs asynchronously. The `tool_call` hook additionally strips `--no-verify`
+from any `git commit` command the agent issues (defence-in-depth against the
+agent circumventing pre-commit hooks).
+
+---
+
+## Configuration reference
+
+### `.nano-staged.json` (project-level, required)
+
+Maps glob patterns to commands. nano-staged **appends matched filenames** to
+each command. One config feeds both this extension and any pre-commit hook.
+
+```json
+{
+  "**/*.{js,ts,tsx}": ["oxlint --fix", "tsc --noEmit"],
+  "**/*.css": "stylelint --fix",
+  "**/*.{json,md,yaml}": "prettier --write",
   "src/**/*.rs": "cargo clippy --fix --allow-dirty"
 }
 ```
 
-> **Tip:** for `tsc --noEmit`, put it as a separate array entry after the linter.
-> nano-staged runs array entries sequentially — lint first, then typecheck.
+For sequential commands (lint then typecheck), use an array — nano-staged runs
+array entries in order.
 
-### When linting does NOT run
-
-- No files were modified via `edit`/`write` tools
-- Extension is disabled via `/lint-check`
-- Anti-loop protection suppresses identical errors (configurable)
-
-## Configuration
-
-Create `~/.pi/extensions/lint-check.json` (user-level) or
-`<project>/.pi/extensions/lint-check.json` (project-level, overrides user):
+### `~/.pi/extensions/lint-check.json` or `<project>/.pi/extensions/lint-check.json`
 
 ```jsonc
 {
-  // Error substrings to ignore in lint/typecheck output
-  "ignoreErrors": ["TS6059"],
+  // Error substrings to ignore in lint output (substring match)
+  "ignoreErrors": ["TS6059", "warning: unused variable"],
 
-  // Max consecutive identical failures before suppressing (0 = disable)
+  // Max consecutive IDENTICAL failures before suppressing (0 = disable)
   "maxConsecutiveFailures": 3,
 
   // Custom nano-staged config path (default: auto-discover .nano-staged.json)
@@ -78,51 +141,145 @@ Create `~/.pi/extensions/lint-check.json` (user-level) or
 }
 ```
 
-### Interactive Settings
+Project-level overrides user-level.
 
-Use `/lint-check` to manage settings:
+---
 
-- **Toggle on/off** — enable/disable for current session
-- **View config** — see current settings and config file paths
-- **Manage ignored errors** — add/remove ignored error substrings
-- **Reset config** — reset user/project/both to defaults
+## Critical gotchas (read these once)
 
-Status bar shows `lint-check` (green = enabled, yellow = disabled, red = errors).
+These are the things that will silently break your setup. All of them are
+load-bearing — none are obvious from the docs.
+
+### 1. Do NOT use `{}` in commands
+
+nano-staged is **not** lint-staged. The `{}` placeholder is not interpolated;
+it gets passed as a literal filename and the linter fails with
+"No such file or directory".
+
+```jsonc
+// BAD — the literal "{}" is passed as a filename
+{"**/*.md": "okf fmt -w {}"}
+
+// GOOD — nano-staged appends filenames itself
+{"**/*.md": "okf fmt -w"}
+```
+
+### 2. Commands must be in PATH (no relative or `./` paths)
+
+nano-staged's internal `which()` rejects any command containing `/` (a
+security measure). This means:
+
+- `./node_modules/.bin/prettier` — **rejected**
+- `.okf/okf` — **rejected**
+- `prettier` — ✓ resolved via PATH (nano-staged prepends `node_modules/.bin`)
+- `okf` — ✓ if installed globally
+
+If you vendor a binary in your repo, symlink it into `~/.local/bin/` or install
+it globally (`cargo install`, `npm install -g`, etc.).
+
+### 3. Commands run with `cwd` = git root, not pi's cwd
+
+nano-staged executes each command with the working directory set to the git
+toplevel of the project that owns the modified file. Relative paths in your
+command resolve from there. The extension itself derives the project root from
+the modified files (walking up to `.nano-staged.json` or `.git`), so it works
+even when pi is launched from a different directory than the project.
+
+### 4. `nanoStaged is not a function` after install
+
+If you see this in the toast, the installed nano-staged is ESM-only and the
+extension failed to unwrap its default export. Update pi-etc to a version
+containing the `require('nano-staged').default` fix (commit `67ff6ab` or
+later). `pi update git:git@gitverse.ru:e4779/pi-etc.git`.
+
+### 5. The extension is a no-op without `.nano-staged.json`
+
+If no config file is found, nano-staged throws "Create Nano Staged config."
+and the toast shows that error. This is expected — drop a `.nano-staged.json`
+in the project root and try again.
+
+---
+
+## UI behaviour
+
+| State | Footer | Toast |
+|---|---|---|
+| Idle, enabled | `lint-check` (dim) | — |
+| Running | `lint-check running...` | — |
+| Success | `lint-check` (dim) | — |
+| Errors (first time) | `lint-check ✗` (red) | one-line summary, e.g. `lint-check: 3 errors — run /lint-check for details` |
+| Errors (repeated N×) | `lint-check (suppressed — same errors 3×)` (yellow) | — |
+
+The previous design rendered errors as a bordered widget above the input
+field, which looked like a second prompt. That was removed — the toast is now
+a single line, and full text is available on demand via `/lint-check → View
+last errors`.
 
 ### Anti-loop protection
 
-If nano-staged returns the **same errors** on consecutive agent turns, the extension assumes the agent can't fix them. After `maxConsecutiveFailures` identical failures (default: 3), the error widget is **suppressed** and the status bar shows `(suppressed — same errors 3×)`. The protection resets when:
+If nano-staged returns the **same errors** on consecutive agent turns, the
+extension assumes the agent can't fix them. After `maxConsecutiveFailures`
+identical failures (default 3), the toast is suppressed and the footer reads
+`(suppressed — same errors 3×)`. The protection resets when:
 
-- The agent response has no lint/typecheck errors
-- The error output changes (different errors)
+- the agent response has no lint errors, **or**
+- the error output changes (different errors)
 
 Set `maxConsecutiveFailures: 0` to disable.
+
+---
+
+## Interactive `/lint-check` command
+
+- **Disable / Enable** — toggle for current session
+- **View current config** — settings + config file paths
+- **View last errors (N)** — full text of the most recent failure (only shown
+  when there are stored errors)
+- **Manage ignored errors** — add/remove `ignoreErrors` substrings
+- **Reset config** — reset user/project/both to defaults
+
+---
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| No linting happens | No `.nano-staged.json` in project root | Create one (see example above) |
-| No linting happens | No files modified by agent | Extension skips when `edit`/`write` not used |
-| `nano-staged` not found | `node_modules` not installed | Run `pi install` again or `npm install` |
-| False "no git repo" error | Extension used outside git repo | git repo required for `git status` |
-| Linter not found | Tool not installed in project | Install the linter: `npm install -D oxlint` |
-| Errors suppressed | Anti-loop kicked in | Fix errors once, or set `maxConsecutiveFailures: 0` |
+| Nothing happens after edits | `.nano-staged.json` missing in project root | Add one (see Quickstart step 4) |
+| Nothing happens after edits | No files modified by `edit`/`write` (only `bash` used) | Extension only tracks edit/write |
+| `.okf/okf does not exist` / `./bin/foo does not exist` | Command contains `/` — rejected by `which()` | Install tool globally or symlink into PATH (gotcha #2) |
+| `nanoStaged is not a function` | Old pi-etc, before ESM-unwrap fix | `pi update git:git@gitverse.ru:e4779/pi-etc.git` |
+| `Create Nano Staged config.` | Config file not found from modified file's location | Drop `.nano-staged.json` at project root |
+| `noGitRepo` error | Modified file is not inside a git repo | git repo required — `git init` |
+| Errors suppressed after 3 turns | Anti-loop protection | Fix errors once, or set `maxConsecutiveFailures: 0` |
+| Toast still looks like a second input box | Outdated pi-etc with `setWidget()` | Update pi-etc to ≥ `92d8f7d` |
+
+---
 
 ## Requirements
 
-- The project must be a git repository
-- Project must have `.nano-staged.json` (or one of nano-staged's config formats)
-- Required linters/tools must be available (`npx oxlint`, `npx tsc`, etc.)
+- The project must be a git repository.
+- The project must have `.nano-staged.json` (or another nano-staged config
+  format) at the root.
+- Linters/formatters referenced in the config must be **in PATH** (gotcha #2).
+- `pi` with the pi-etc package installed (Quickstart step 1).
 
 > **Robustness:** `nano-staged` is loaded with a guarded `require`. If the
 > package is missing for any reason, the extension still loads — pi will not
-> crash — and silently skips the post-turn lint run (only the `--no-verify`
-> stripping remains active). Install via `npm install nano-staged` in the
-> pi-etc package directory to enable lint runs.
+> crash — and silently skips the post-turn lint run (only `--no-verify`
+> stripping remains active).
+
+---
+
+## Hooks used
+
+| Hook | Purpose |
+|---|---|
+| `tool_call` | Strips `--no-verify` from `git commit` commands |
+| `tool_result` | Tracks files modified by `edit` and `write` tools |
+| `agent_end` | Runs `nano-staged --unstaged` on changed files (async) |
 
 ## Inspiration
 
 - [Evil Martians: Stop writing rules in AGENTS.md](https://evilmartians.com/chronicles/stop-writing-rules-in-agents-md-use-agent-hooks-and-nano-staged-instead)
-- Architecture from [@prateekmedia/pi-hooks](https://github.com/prateekmedia/pi-hooks) (core/hook split)
-- Powered by [nano-staged](https://github.com/usmanyunusov/nano-staged) (zero-dependency git file runner)
+- Architecture from [@prateekmedia/pi-hooks](https://github.com/prateekmedia/pi-hooks)
+- Powered by [nano-staged](https://github.com/usmanyunusov/nano-staged)
