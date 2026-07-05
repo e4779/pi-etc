@@ -378,13 +378,20 @@ export default function (pi: ExtensionAPI) {
             return;
           }
 
-          ctx.ui.notify('Lint/typecheck failed!', 'error');
-          ctx.ui.setWidget('lint-check', errors);
+          // Single source of truth: notify with the actual error text, plus a
+          // footer ✗ indicator. We deliberately do NOT use setWidget() here —
+          // its default placement ("aboveEditor") overlays the input field,
+          // which makes the error look like part of the user's prompt.
+          // The toast already shows the full text; the footer tracks state.
+          const summary =
+            errors.length === 1
+              ? `lint-check: ${errors[0]}`
+              : `lint-check: ${errors.length} errors\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n…(+${errors.length - 5} more)` : ''}`;
+          ctx.ui.notify(summary, 'error');
           ctx.ui.setStatus('lint-check', `${RED}lint-check ✗${RESET}`);
         } else {
           consecutiveFailures = 0;
           lastErrorFingerprint = '';
-          ctx.ui.setWidget('lint-check', undefined);
           ctx.ui.setStatus('lint-check', getStatusText(enabled));
         }
       })
