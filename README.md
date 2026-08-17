@@ -24,6 +24,7 @@ pi install ~/dev/pi-etc -l
 | **pi-way** | `extensions/pi-way.ts` | Инжектит принципы pi-way в системный промпт каждого сеанса |
 | **lint-check** | `extensions/lint-check/index.ts` | Запускает линтеры через nano-staged после каждого хода агента |
 | **qwen-flavor** | `extensions/qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
+| **co-author** | `extensions/co-author/index.ts` | Автоматически добавляет `Co-authored-by:` trailer к `git commit` по текущей модели. Маппинг model.id → identity в `~/.pi/agent/coauthors.json`, fallback — выводится из model.id |
 
 ### Скиллы (`skills/`)
 
