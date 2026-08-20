@@ -177,11 +177,17 @@ Prefer this over `take_screenshot` — text is cheaper and more precise than
 pixels. `verbose=true` dumps the full a11y tree (only when basic lacks detail).
 
 ### `take_screenshot`
+
+> **Path restriction:** `filePath` must be inside an allowed workspace root.
+On macOS, **use `"$TMPDIR"`** (`/var/folders/…/T/`), not `/tmp` — `/tmp` resolves
+to `/private/tmp` which is outside the default root and gives `Access denied`.
+See `../SKILL.md` → Screenshots for details.
+
 ```bash
-mcporter call chrome-devtools.take_screenshot filePath=/tmp/p.png
-mcporter call chrome-devtools.take_screenshot uid=1_5 filePath=/tmp/el.png    # one element
-mcporter call chrome-devtools.take_screenshot fullPage=true filePath=/tmp/full.png
-mcporter call chrome-devtools.take_screenshot format=jpeg quality=70 filePath=/tmp/p.jpg
+mcporter call chrome-devtools.take_screenshot filePath="$TMPDIR/p.png"
+mcporter call chrome-devtools.take_screenshot uid=1_5 filePath="$TMPDIR/el.png"    # one element
+mcporter call chrome-devtools.take_screenshot fullPage=true filePath="$TMPDIR/full.png"
+mcporter call chrome-devtools.take_screenshot format=jpeg quality=70 filePath="$TMPDIR/p.jpg"
 ```
 | param | type | notes |
 |---|---|---|

@@ -85,7 +85,7 @@ mcporter call chrome-devtools.navigate_page type=reload ignoreCache=true
 # See — snapshot (a11y tree, primary view) or screenshot (colors/layout)
 mcporter call chrome-devtools.take_snapshot
 mcporter call chrome-devtools.take_snapshot verbose=true
-mcporter call chrome-devtools.take_screenshot filePath=/tmp/page.png
+mcporter call chrome-devtools.take_screenshot filePath="$TMPDIR/page.png"    # ⚠️ see Screenshots below
 
 # Interact (need a uid from a snapshot)
 mcporter call chrome-devtools.click uid=1_5 includeSnapshot=true
@@ -108,6 +108,59 @@ mcporter call chrome-devtools.close_page pageId=2     # last open page can't clo
 
 For multi-statement logic, write a full body — `() => { ... return x; }`.
 
+## Screenshots — where to save & how to read
+
+`take_screenshot` writes to `filePath`. **The path must be inside an allowed
+workspace root**, otherwise you get `Access denied: path … is not within any of
+the configured workspace roots`.
+
+### Where to save
+
+| Location | Works? | Notes |
+|---|---|---|
+| `"$TMPDIR"` | ✅ **default safe choice** | macOS `/var/folders/…/T/` — always allowed |
+| `/tmp` | ❌ on macOS | canonical is `/private/tmp`, outside the root |
+| project dir | ❌ by default | not a root unless configured |
+| `~/.mcporter` | ❌ by default | not a root |
+
+**Rule: always use `"$TMPDIR"`** (the OS temp dir). On macOS this is
+`/var/folders/…/T/` — *not* `/tmp`.
+
+```bash
+# Full page
+mcporter call chrome-devtools.take_screenshot filePath="$TMPDIR/page.png"
+
+# One element (by uid from a snapshot)
+mcporter call chrome-devtools.take_screenshot uid=1_5 filePath="$TMPDIR/el.png"
+
+# Full scrollable page
+mcporter call chrome-devtools.take_screenshot fullPage=true filePath="$TMPDIR/full.png"
+
+# Smaller payload (jpeg + downscale)
+mcporter call chrome-devtools.take_screenshot format=jpeg quality=70 filePath="$TMPDIR/page.jpg"
+```
+
+### How to view the screenshot
+
+After saving, `read` the file to see it:
+
+```bash
+# In the agent: the read tool displays the image inline
+read /var/folders/…/T/page.png    # use the actual path from $TMPDIR
+```
+
+### Unrestricted paths (optional)
+
+To allow saving anywhere (e.g. the project dir), add `--allowUnrestrictedPaths`
+to the server args in `~/.mcporter/mcporter.json`, then `mcporter daemon restart`.
+This disables the path safety check — use only with a trusted local client.
+
+### Element screenshots vs full page
+
+`uid=1_5` screenshots **just that element** (clipped to its bounding box).
+Without `uid`, you get the **current viewport**. `fullPage=true` captures the
+entire scrollable page (incompatible with `uid`).
+
 ## When you need more
 
 - **First-run setup** (mcporter/Chrome/config/daemon missing) → `read skills/chrome-devtools/references/setup.md`
@@ -119,6 +172,7 @@ Load these only when the task needs them — that's the whole point.
 ## Anti-patterns
 
 - ❌ `take_screenshot` to read text/DOM → use `take_snapshot` (cheaper, precise)
+- ❌ `filePath=/tmp/…` on macOS → `Access denied` (canonical `/private/tmp` is outside the root). Use `"$TMPDIR"` → see Screenshots section
 - ❌ Multiple `fill` calls for one form → use `fill_form` (one round-trip)
 - ❌ Guessing selectors when you have a `uid` → snapshot first, use the uid
 - ❌ **`evaluate_script` for actions** (`.click()`, `.value=`, `scrollTo`) → use `click` / `fill` / `press_key` (real events + snapshot)
