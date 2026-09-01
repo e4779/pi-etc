@@ -7,15 +7,33 @@ type MessageEndEvent = Extract<ExtensionEvent, { type: "message_end" }>;
 import { getCoreSystemPrompt } from "./system-prompt.js";
 import { createEditToolDefinition } from "./edit-qwen.js";
 import { extractToolCallsFromMessage } from "./tool-call-extractor.js";
+import { getQwenFabricAddendum } from "./fabric-addendum.js";
+import { isFabricFullCode } from "../lib/fabric-detect.js";
 import { execSync } from "node:child_process";
 
 /**
- * Pi-qwen extension: replaces the pi system prompt with Qwen Code's
- * system prompt and activates the Qwen-style edit tool when /qwen is toggled on.
+ * Pi-qwen extension: adapts Qwen models to pi + Fabric.
+ *
+ * Two modes, selected automatically:
+ *
+ * 1. Fabric full-code mode (pi-fabric package active, fullCodeMode !== false):
+ *    fabric_exec is the only tool, so the legacy edit-tool override and the
+ *    full Qwen Code prompt swap are counterproductive. Instead, a compact
+ *    behavioral addendum is APPENDED to the chained system prompt (Fabric's
+ *    tool contract stays authoritative).
+ *
+ * 2. Legacy mode (no Fabric / orchestration-only): the original behavior —
+ *    full Qwen Code system prompt + Qwen-style edit tool override.
+ *
+ * The message_end extractor (XML tool calls hidden in <thinking>) runs in
+ * both modes; under Fabric it rarely fires, but it is the only safety net
+ * when the model fails to emit a proper tool_use block at all.
  */
 export default function (pi: ExtensionAPI) {
   // ---- State ----
   let qwenEnabled = false;
+  let legacyEditRegistered = false;
+  // Fabric full-code detection is shared with pi-way: ../lib/fabric-detect.ts
 
   // ---- Hook: session_start (remind about /qwen-flavor for Qwen models) ----
   pi.on("session_start", async (event, ctx) => {
@@ -26,47 +44,59 @@ export default function (pi: ExtensionAPI) {
     if (!/qwen/i.test(modelId)) return;
     if (qwenEnabled) return;
 
+    const cwd = (ctx as { cwd?: string }).cwd ?? process.cwd();
+    const fabricMode = isFabricFullCode(cwd);
+
     const enable = await ctx.ui.confirm(
       "Qwen model detected",
-      "You're using a Qwen model without /qwen-flavor.\n\nWithout qwen-flavor, the edit tool uses pi's native format (oldText/newText)\nwhich Qwen models often get wrong. Enable qwen-flavor?",
+      fabricMode
+        ? "You're using a Qwen model with Fabric in full-code mode.\n\nFabric already fixes the edit-format and tool-call issues qwen-flavor was built for. What remains useful is the light behavioral addendum (no early stopping, faithful reporting, scope discipline, retry-from-error).\n\nEnable the Qwen addendum?"
+        : "You're using a Qwen model without /qwen-flavor.\n\nWithout qwen-flavor, the edit tool uses pi's native format (oldText/newText) which Qwen models often get wrong. Enable qwen-flavor?",
     );
 
     if (enable) {
       qwenEnabled = true;
       ctx.ui.setStatus("qwen-flavor", "🔹 qwen-flavor");
-      ctx.ui.notify("Qwen flavor enabled ✓", "info");
+      ctx.ui.notify(
+        fabricMode
+          ? "Qwen addendum enabled ✓ (Fabric full-code mode)"
+          : "Qwen flavor enabled ✓",
+        "info",
+      );
     } else {
       ctx.ui.notify(
-        "⚠️ Qwen model without qwen-flavor. Type /qwen-flavor if edit tool fails.",
-        "warning",
+        fabricMode
+          ? "Type /qwen-flavor anytime to enable the behavioral addendum."
+          : "⚠️ Qwen model without qwen-flavor. Type /qwen-flavor if edit tool fails.",
+        fabricMode ? "info" : "warning",
       );
     }
   });
 
-  // ---- Command: /qwen ----
+  // ---- Command: /qwen-flavor ----
   pi.registerCommand("qwen-flavor", {
-    description: "Toggle Qwen Code system prompt and edit tool",
+    description: "Toggle Qwen Code adaptation (addendum under Fabric, full flavor otherwise)",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     handler: async (_args: any, ctx: any) => {
       qwenEnabled = !qwenEnabled;
 
       if (qwenEnabled) {
-        // Set footer status indicator
         ctx.ui.setStatus("qwen-flavor", "🔹 qwen-flavor");
 
-        // Warn if not using a qwen model
         const modelId = ctx.model?.id ?? "";
         const isQwenModel = /qwen/i.test(modelId);
+        const cwd = ctx.cwd ?? process.cwd();
+        const mode = isFabricFullCode(cwd) ? "addendum (Fabric full-code)" : "full Qwen Code flavor";
+
         if (!isQwenModel) {
           ctx.ui.notify(
-            `Qwen flavour enabled ⚠️ (model: ${modelId} — might not match Qwen training)`,
+            `Qwen flavor enabled ⚠️ (model: ${modelId} — might not match Qwen training; mode: ${mode})`,
             "warning",
           );
         } else {
-          ctx.ui.notify(`Qwen flavor enabled ✓ (${modelId})`, "info");
+          ctx.ui.notify(`Qwen flavor enabled ✓ (${modelId}; mode: ${mode})`, "info");
         }
       } else {
-        // Clear footer status indicator
         ctx.ui.setStatus("qwen-flavor", undefined);
         ctx.ui.notify("Qwen flavor disabled ✓", "info");
       }
@@ -76,6 +106,8 @@ export default function (pi: ExtensionAPI) {
   // ---- Hook: message_end (extract tool calls from thinking blocks) ----
   // Qwen models sometimes encode tool calls as XML inside <thinking> blocks
   // instead of proper JSON tool_use content blocks. This handler extracts them.
+  // Mode-agnostic safety net: under Fabric it rarely fires, but it is the only
+  // rescue when the model fails to emit a proper tool_use block at all.
   pi.on("message_end", async (event: MessageEndEvent, _ctx: ExtensionContext) => {
     if (event.message.role !== "assistant") return;
 
@@ -105,20 +137,38 @@ export default function (pi: ExtensionAPI) {
 
   // ---- Hook: before_agent_start ----
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pi.on("before_agent_start", async (_ctx: any) => {
+  pi.on("before_agent_start", async (event: any, ctx: ExtensionContext) => {
     if (!qwenEnabled) {
       // Return nothing — keep pi's default prompt
       return;
     }
 
-    // Get current model
-    const modelId = _ctx.model?.id ?? "unknown";
+    const modelId = ctx.model?.id ?? (event as { model?: { id?: string } })?.model?.id ?? "unknown";
+    const cwd =
+      (event as { systemPromptOptions?: { cwd?: string } })?.systemPromptOptions?.cwd ??
+      (ctx as { cwd?: string }).cwd ??
+      process.cwd();
+
+    if (isFabricFullCode(cwd)) {
+      // Fabric full-code mode: APPEND the behavioral addendum to the chained
+      // prompt. Never replace — Fabric's session guidance (single fabric_exec
+      // tool, pi.* inside code) must stay authoritative, and Fabric appends
+      // its own section after ours either way. No edit-tool override: the
+      // built-in pi.edit already normalizes Qwen-style field spellings
+      // (old_string/new_string, file_path, ...) and a same-name override
+      // would only narrow that surface.
+      return {
+        systemPrompt: event.systemPrompt + "\n\n" + getQwenFabricAddendum(),
+      };
+    }
+
+    // ---- Legacy mode (no Fabric / orchestration-only): original behavior ----
 
     // Check if this is a git repo
     let isGitRepo = false;
     try {
       execSync("git rev-parse --is-inside-work-tree", {
-        cwd: _ctx.cwd,
+        cwd,
         stdio: "ignore",
       });
       isGitRepo = true;
@@ -129,19 +179,19 @@ export default function (pi: ExtensionAPI) {
     // Build Qwen system prompt
     const qwenPrompt = getCoreSystemPrompt(undefined, modelId, undefined, isGitRepo);
 
-    // Get current active tools
-    const activeTools = pi.getActiveTools();
-
-    // Register custom edit tool (Qwen Code style) with name "edit"
-    // This should override the built-in edit tool
-    const editTool = createEditToolDefinition(_ctx.cwd);
-    pi.registerTool(editTool);
+    // Register custom edit tool (Qwen Code style) with name "edit".
+    // Register once per session; pi has no unregister API, so the override
+    // persists until restart even after toggling off (same as before).
+    if (!legacyEditRegistered) {
+      pi.registerTool(createEditToolDefinition(cwd));
+      legacyEditRegistered = true;
+    }
 
     // Re-set active tools to ensure our custom edit is used
     // Filter out any duplicate 'edit' entries
+    const activeTools = pi.getActiveTools();
     const toolsWithoutEdit = activeTools.filter((name: string) => name !== "edit");
-    const finalTools = [...toolsWithoutEdit, "edit"];
-    pi.setActiveTools(finalTools);
+    pi.setActiveTools([...toolsWithoutEdit, "edit"]);
 
     // Return the system prompt override
     return {
