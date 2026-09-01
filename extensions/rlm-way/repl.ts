@@ -31,9 +31,9 @@ import { Type } from "typebox";
 const nodeRequire = createRequire(import.meta.url);
 const RLM_STATE_PATH = path.join(homedir(), ".pi", "agent", "rlm-way-state.json");
 const RLM_LOG_DB_PATH = path.join(homedir(), ".pi", "agent", "rlm-way-log.db");
-const RLM_TOOLS = ["ipython"];
+export const RLM_TOOLS = ["ipython"];
 
-const INIT_CELL = `
+export const INIT_CELL = `
 import subprocess as _sp, json as _json, difflib as _difflib, pathlib as _pl, shutil as _shutil, os as _os
 _RLM_WIN = _os.name == "nt"
 def _rlm_find(exe, extra=()):
@@ -108,7 +108,7 @@ function readState(): { notebookId?: string } {
 }
 
 let logDb: unknown;
-function logDbOpen(): any | false {
+export function logDbOpen(): any | false {
   if (logDb !== undefined) return logDb as any;
   try {
     const { DatabaseSync } = nodeRequire("node:sqlite");
@@ -124,7 +124,7 @@ function logDbOpen(): any | false {
   return logDb as any;
 }
 
-function logCell(notebook: string, count: number | undefined, status: string, code: string): void {
+export function logCell(notebook: string, count: number | undefined, status: string, code: string): void {
   const db = logDbOpen();
   if (!db) return;
   try {
@@ -1461,4 +1461,8 @@ export default function nteractReplExtension(pi: ExtensionAPI) {
       session = null;
     }
   });
+}
+
+export function fullBackendAvailable(): boolean {
+  return detectBootstrap().kind === "ready";
 }
