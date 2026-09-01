@@ -22,6 +22,24 @@ Inspiration: [Mario Zechner's blog](https://mariozechner.at/posts/2025-11-30-pi-
 
 ---
 
+## Working under Fabric full-code mode
+
+When the `pi-fabric` package runs in full-code mode, `fabric_exec` is the only tool and everything below shifts in-program. The pi-way values hold; the mechanics change:
+
+| Classic pi-way | Under Fabric |
+|---|---|
+| `mcporter list <s> --schema` + `mcporter call` | `tools.list`/`tools.search`/`tools.describe` for discovery; call `mcp.<server>.<tool>()` directly in code — schemas never enter context |
+| `Agent` tool (needs @tintinweb/pi-subagents) | No top-level Agent tool. Delegate via `agents.run()` / `workflow.agent()` (budgeted, optionally schema-validated); background via `agents.spawn()` + `agents.wait()` |
+| `pisub` from the terminal | Still works, but through `pi.bash` — reserve for tmux-steerable workers; one-shot work belongs in `agents.run()` |
+| Make as orchestrator | Awaits / `workflow.parallel()` in one program; Make only for durable cross-session recipes |
+| `tmux` for background | Windows: `extensions.pwsh-start-job()` (+ `pwsh-get-job`); tmux where it exists |
+| bash for everything | `pi.read`/`pi.grep`/`pi.find` over cat/grep/ls; bash for system commands only |
+| PLAN.md / TODO.md | Unchanged — still the tracking layer |
+
+Under full-code mode the `pi-way` extension injects **nothing** — Fabric's own guidance, its agents/workflow APIs, and the windows-preferences skill cover all of it; this table stays as the reference mapping (`extensions/lib/fabric-detect.ts` decides).
+
+---
+
 ## Explore Your Tools
 
 You have more than just read/write/edit/bash. Before you start working, understand what's available:
@@ -154,16 +172,16 @@ Experiments, parallel explorations, review→fix — all isolated via filesystem
 
 ## Summary
 
-| Need | Pi Way |
-|------|--------|
-| Sub-agent (one-shot or steerable) | `pisub` (run for one-shot, spawn+send+steer for interactive) |
-| Inline one-shot result (no log) | `Agent` tool + agent `.md` files |
-| Orchestration | Make — data flows through recipes (lenses) |
-| External tool | mcporter CLI (`mcporter list <s> --schema` first!), CLI + README |
-| Planning | `PLAN.md` |
-| Task tracking | `TODO.md` |
-| Background process | `tmux` |
-| Context gathering | Separate session → artifact → fresh session |
+| Need | Pi Way (classic) | Under Fabric full-code |
+|------|------------------|------------------------|
+| Sub-agent one-shot | `pisub run` | `agents.run()` / `workflow.agent()` in-program |
+| Steerable / long-running agent | `pisub spawn` + `steer` | `agents.spawn()` + `agents.wait()`, or `pisub` via `pi.bash` |
+| Orchestration | Make recipes | awaits / `workflow.parallel()` in one program |
+| External tool | mcporter CLI (`--schema` first), CLI + README | `tools.describe` + `mcp.<server>.<tool>()` |
+| Planning | `PLAN.md` | unchanged |
+| Task tracking | `TODO.md` | unchanged |
+| Background process | `tmux` | `extensions.pwsh-start-job()` (Windows) / tmux |
+| Context gathering | session → artifact → fresh session | same |
 
 ---
 

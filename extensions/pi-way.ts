@@ -1,11 +1,17 @@
 /**
  * pi-way extension — injects pi-way principles into the system prompt.
  *
- * Uses the before_agent_start hook to append principles to every session's
- * system prompt. No symlinks, no directory convention — just a clean event hook.
+ * Fabric-aware: under pi-fabric full-code mode NOTHING is injected. Every
+ * classic principle is covered natively — context economy and batching by
+ * Fabric's own guidance, delegation by agents.run()/workflow helpers,
+ * background processes by the windows-preferences skill. The file-tracking
+ * style (PLAN.md/TODO.md) is user-directed on purpose. The classic block is
+ * kept verbatim for sessions without Fabric; see skills/pi-way/SKILL.md for
+ * the full classic→Fabric mapping table.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { isFabricFullCode } from "./lib/fabric-detect.js";
 
 const PI_WAY_PRINCIPLES = `## Pi-way principles
 
@@ -18,7 +24,16 @@ const PI_WAY_PRINCIPLES = `## Pi-way principles
 - **No MCP dumps.** CLI tools + README-driven discovery. mcporter for MCP when needed.`;
 
 export default function (pi: ExtensionAPI) {
-  pi.on("before_agent_start", async (event, _ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
+    const cwd =
+      (event as { systemPromptOptions?: { cwd?: string } })?.systemPromptOptions?.cwd ??
+      (ctx as { cwd?: string })?.cwd ??
+      process.cwd();
+
+    // Fabric full-code mode: everything this block would say is already said
+    // by Fabric's guidance, the windows-preferences skill, or is user-directed.
+    if (isFabricFullCode(cwd)) return;
+
     return {
       systemPrompt: event.systemPrompt + "\n\n" + PI_WAY_PRINCIPLES,
     };
