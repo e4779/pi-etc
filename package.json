@@ -2,7 +2,11 @@
   "name": "pi-etc",
   "version": "0.1.0",
   "description": "Personal pi coding agent extensions, skills, and themes",
-  "keywords": ["pi-package", "pi-extension", "pi-skill"],
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-skill"
+  ],
   "type": "module",
   "pi": {
     "extensions": [
@@ -18,6 +22,7 @@
   "author": "e41q",
   "license": "ISC",
   "dependencies": {
+    "@runtimed/node": "^0.5.6",
     "diff": "^5.2.0",
     "nano-staged": "^1.0.2"
   },
@@ -27,6 +32,7 @@
     "typebox": "*"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "^0.84.4",
     "typescript": "^5.8.3"
   }
 }
