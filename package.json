@@ -10,7 +10,10 @@
   "type": "module",
   "pi": {
     "extensions": [
-      "./extensions/**/*.ts"
+      "./extensions/pi-way.ts",
+      "./extensions/qwen/index.ts",
+      "./extensions/lint-check/index.ts",
+      "./extensions/rlm-way/repl.ts"
     ],
     "skills": [
       "./skills"

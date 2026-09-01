@@ -1197,8 +1197,8 @@ export default function nteractReplExtension(pi: ExtensionAPI) {
       "Kernel API is pre-injected: bash(cmd), read(path), edit(path, old, new), write(path, content), rlm(prompt) for one-shot sub-agents, mcp('server.tool', args) for MCP.",
       "Prefer one composed cell over many small tool calls: loop, retry, branch, aggregate — then print a summary.",
       "A traceback is data: fix the code and rerun instead of starting over.",
-      "Use `dependencies` on the first call to pre-install packages; `python_add_dependencies` hot-installs later.",
-      "python_save_notebook exports the session to .ipynb for review.",
+      "Pass `dependencies` on any ipython call to hot-install packages into the running kernel (no restart).",
+      "ipython_save_notebook exports the session to .ipynb for review.",
     ],
     parameters: PYTHON_PARAMS,
     renderCall(args, theme, _context) {
@@ -1355,35 +1355,8 @@ export default function nteractReplExtension(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool<typeof ADD_DEPENDENCIES_PARAMS, AddDependenciesDetails>({
-    name: "python_add_dependencies",
-    label: "Add Dependencies",
-    description:
-      "Install packages into the running Python environment without restarting. Accepts pip-style specs like 'matplotlib', 'numpy>=2', 'requests'. The kernel stays hot.",
-    promptSnippet:
-      "python_add_dependencies: install packages into the running Python session (no restart needed).",
-    parameters: ADD_DEPENDENCIES_PARAMS,
-    async execute(_toolCallId, params, signal) {
-      if (signal?.aborted) throw new Error("aborted");
-      if (!params.packages.length) {
-        return { content: [{ type: "text", text: "No packages given." }], details: {} };
-      }
-      const sess = await ensureSession();
-      await addDependenciesAndSync(sess, params.packages);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Installed into ${sess.notebookId}: ${params.packages.join(", ")}`,
-          },
-        ],
-        details: { notebook_id: sess.notebookId, packages: params.packages },
-      };
-    },
-  });
-
   pi.registerTool<typeof SAVE_NOTEBOOK_PARAMS, SaveNotebookDetails>({
-    name: "python_save_notebook",
+    name: "ipython_save_notebook",
     label: "Save Notebook",
     description:
       "Save the current Python session as an .ipynb file. If no path is given, saves to the original location (if it was opened from a file). Provide a path to save elsewhere.",
