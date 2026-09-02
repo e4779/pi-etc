@@ -7,32 +7,30 @@ description: >
   screenshots, or measure page performance. Workflow: navigate, take a11y
   snapshots (every element gets a uid), click/fill/hover via uid, evaluate
   JS, read console & network, capture screenshots, run performance traces.
-  Wraps `mcporter call chrome-devtools.*` so the 29-tool schema (~18k tokens)
-  stays out of context until needed.
-allowed-tools: bash read
+  Call `mcp.chrome_devtools.*` inside `fabric_exec` — type-checked, no CLI spawn.
 ---
 
 # Chrome DevTools
 
-Drive a real Chrome tab through the `chrome-devtools` MCP via `mcporter call`.
-The top tools cover ~90% of real tasks; the rest loads on demand.
-
-See the [mcporter skill](../mcporter/SKILL.md) for mcporter basics (call syntax,
-daemon, config, output control).
+Drive a real Chrome tab through the `chrome-devtools` MCP via Fabric's `mcp.*`
+surface. All calls are type-checked TypeScript inside `fabric_exec` — no
+`mcporter call` CLI, no process spawn.
 
 ## Prerequisites
 
-```bash
-mcporter daemon status                                    # green?
-mcporter call chrome-devtools.list_pages --output text    # prints a page → ready
+```ts
+// Check MCP servers are loaded
+await mcp.$servers();
+// Smoke test — list pages
+await mcp.chrome_devtools.list_pages({});
 ```
 
-Missing or broken? `read skills/chrome-devtools/references/setup.md` (inventory →
-repair → smoke test). If calls fail with `appears offline` / `Connection
-closed`, restart the daemon:
+Missing or broken? See `<skill-dir>/references/setup.md` (inventory → repair →
+smoke test). If calls fail with `appears offline` / `Connection closed`, reload
+MCP:
 
-```bash
-mcporter daemon restart && sleep 3
+```ts
+await mcp.$reload();
 ```
 
 ## When to use
@@ -40,7 +38,7 @@ mcporter daemon restart && sleep 3
 - Browser automation / scraping, front-end debugging, UI verification after code changes.
 - Any task where you'd reach for Playwright/Puppeteer.
 
-**Don't** use it for static HTML — `read` the file. Chrome is for *live* /
+**Don't** use it for static HTML — `pi.read` the file. Chrome is for *live* /
 JS-rendered pages.
 
 ## Core workflow
@@ -53,7 +51,7 @@ list_pages → select_page → navigate_page → take_snapshot → (act) → ver
    Prefer it over `take_screenshot` (text is cheaper and more precise than pixels).
 2. **`uid`** from the snapshot addresses elements in `click` / `fill` / `hover`.
 3. After any action, re-snapshot — uids change when the DOM changes. Pass
-   `includeSnapshot=true` on click/fill to get the fresh tree in the same call.
+   `includeSnapshot: true` on click/fill to get the fresh tree in the same call.
 
 ### ⚠️ Use the semantic tool, not `evaluate_script`
 
@@ -63,50 +61,47 @@ list_pages → select_page → navigate_page → take_snapshot → (act) → ver
 
 | Want to… | ❌ Don't | ✅ Do |
 |---|---|---|
-| Click a button/link | `el.click()` in evaluate_script | `click uid=1_5` |
-| Type into a field | `el.value = 'x'` | `fill uid=1_7 value=x` |
-| Fill a form | multiple `fill`s | `fill_form --args '{"elements":[...]}'` |
-| Scroll the page | `window.scrollTo(...)` | `press_key key=End` |
+| Click a button/link | `el.click()` in evaluate_script | `click({ uid: "1_5" })` |
+| Type into a field | `el.value = 'x'` | `fill({ uid: "1_7", value: "x" })` |
+| Fill a form | multiple `fill`s | `fill_form({ elements: [...] })` |
+| Scroll the page | `window.scrollTo(...)` | `press_key({ key: "End" })` |
 | Submit a form | `form.submit()` | `click` the submit button |
-| Hover for a tooltip/menu | `dispatchEvent(...)` | `hover uid=1_3` |
+| Hover for a tooltip/menu | `dispatchEvent(...)` | `hover({ uid: "1_3" })` |
 | Read N items / styles / text | — | **`evaluate_script` is correct here** |
 
 ## Top tools
 
-All calls use `mcporter call chrome-devtools.<tool> key=value ...`
-(`key=value`, `key:value`, or `'tool(k: "v")'`).
+All calls are `mcp.chrome_devtools.<tool>(args)` inside `fabric_exec`.
 
-```bash
-# Navigate
-mcporter call chrome-devtools.navigate_page type=url url=https://example.com
-mcporter call chrome-devtools.new_page url=https://example.com
-mcporter call chrome-devtools.navigate_page type=reload ignoreCache=true
+```ts
+// Navigate
+await mcp.chrome_devtools.navigate_page({ type: "url", url: "https://example.com" });
+await mcp.chrome_devtools.new_page({ url: "https://example.com" });
+await mcp.chrome_devtools.navigate_page({ type: "reload", ignoreCache: true });
 
-# See — snapshot (a11y tree, primary view) or screenshot (colors/layout)
-mcporter call chrome-devtools.take_snapshot
-mcporter call chrome-devtools.take_snapshot verbose=true
-mcporter call chrome-devtools.take_screenshot filePath="$TMPDIR/page.png"    # ⚠️ see Screenshots below
+// See — snapshot (a11y tree, primary view) or screenshot (colors/layout)
+await mcp.chrome_devtools.take_snapshot({});
+await mcp.chrome_devtools.take_snapshot({ verbose: true });
+const tmp = (await pi.bash({ cmd: "echo $TMPDIR" })).output.trim();
+await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
 
-# Interact (need a uid from a snapshot)
-mcporter call chrome-devtools.click uid=1_5 includeSnapshot=true
-mcporter call chrome-devtools.fill uid=1_7 value="hello"
-mcporter call chrome-devtools.fill_form --args '{"elements":[{"uid":"1_7","value":"user"},{"uid":"1_8","value":"pass"}]}'
-mcporter call chrome-devtools.hover uid=1_3
-mcporter call chrome-devtools.press_key key=Enter
-mcporter call chrome-devtools.wait_for --args '{"text":["Welcome","Error"]}'
+// Interact (need a uid from a snapshot)
+await mcp.chrome_devtools.click({ pageId: 1, uid: "1_5", includeSnapshot: true });
+await mcp.chrome_devtools.fillFills({ pageId: 1, uid: "1_7", value: "hello" });
+await mcp.chrome_devtools.fill_form({ pageId: 1, elements: [{ uid: "1_7", value: "user" }, { uid: "1_8", value: "pass" }] });
+await mcp.chrome_devtools.hover({ pageId: 1, uid: "1_3" });
+await mcp.chrome_devtools.press_key({ pageId: 1, key: "Enter" });
+await mcp.chrome_devtools.wait_for({ pageId: 1, text: ["Welcome", "Error"] });
 
-# Evaluate JS — read state, returns JSON. First uid in --args becomes `el`.
-mcporter call chrome-devtools.evaluate_script function='() => document.title'
-mcporter call chrome-devtools.evaluate_script function='() => ({ h1: document.querySelector("h1")?.innerText, links: document.querySelectorAll("a").length })'
-mcporter call chrome-devtools.evaluate_script function='(el) => el.innerText' --args '{"function":"(el) => el.innerText","args":["1_5"]}'
+// Evaluate JS — read state, returns JSON.
+await mcp.chrome_devtools.evaluate_script({ pageId: 1, function: "() => document.title" });
+await mcp.chrome_devtools.evaluate_script({ pageId: 1, function: '() => ({ h1: document.querySelector("h1")?.innerText, links: document.querySelectorAll("a\4.length })' });
 
-# Pages
-mcporter call chrome-devtools.list_pages
-mcporter call chrome-devtools.select_page pageId=2
-mcporter call chrome-devtools.close_page pageId=2     # last open page can't close
+// Pages
+await mcp.chrome_devtools.list_pages({});
+await mcp.chrome_devtools.select_page({ pageId: 2 });
+await mcp.chrome_devtools.close_page({ pageId: 2 });
 ```
-
-For multi-statement logic, write a full body — `() => { ... return x; }`.
 
 ## Screenshots — where to save & how to read
 
@@ -126,69 +121,57 @@ the configured workspace roots`.
 **Rule: always use `"$TMPDIR"`** (the OS temp dir). On macOS this is
 `/var/folders/…/T/` — *not* `/tmp`.
 
-```bash
-# Full page
-mcporter call chrome-devtools.take_screenshot filePath="$TMPDIR/page.png"
+```ts
+const tmp = (await pi.bash({ cmd: "echo $TMPDIR" })).output.trim();
 
-# One element (by uid from a snapshot)
-mcporter call chrome-devtools.take_screenshot uid=1_5 filePath="$TMPDIR/el.png"
-
-# Full scrollable page
-mcporter call chrome-devtools.take_screenshot fullPage=true filePath="$TMPDIR/full.png"
-
-# Smaller payload (jpeg + downscale)
-mcporter call chrome-devtools.take_screenshot format=jpeg quality=70 filePath="$TMPDIR/page.jpg"
+// Full page
+await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
+// One element (by uid from a snapshot)
+await mcp.chrome_devtools.take_screenshot({ pageId: 1, uid: "1_5", filePath: `${tmp}/el.png` });
+// Full scrollable page
+await mcp.chrome_devtools.take_screenshot({ pageId: 1, fullPage: true, filePath: `${tmp}/full.png` });
+// Smaller payload (jpeg + downscale)
+await mcp.chrome_devtools.take_screenshot({ pageId: 1, format: "jpeg", quality: 70, filePath: `${tmp}/page.jpg` });
 ```
 
 ### How to view the screenshot
 
-After saving, `read` the file to see it:
+After saving, `pi.read` the file to see it:
 
-```bash
-# In the agent: the read tool displays the image inline
-read /var/folders/…/T/page.png    # use the actual path from $TMPDIR
+```ts
+await pi.read({ path: `${tmp}/page.png` });  // displays inline
 ```
-
-### Unrestricted paths (optional)
-
-To allow saving anywhere (e.g. the project dir), add `--allowUnrestrictedPaths`
-to the server args in `~/.mcporter/mcporter.json`, then `mcporter daemon restart`.
-This disables the path safety check — use only with a trusted local client.
 
 ### Element screenshots vs full page
 
-`uid=1_5` screenshots **just that element** (clipped to its bounding box).
-Without `uid`, you get the **current viewport**. `fullPage=true` captures the
-entire scrollable page (incompatible with `uid`).
-
+`uid: "1_5"` screenshots **just that element** (clipped to its bounding box).
+Without `uid`, you get the **current viewport**. `fullPage: true` captures the
+entire scrollable page (incompatible with `uid`).> 
 ## When you need more
 
-- **First-run setup** (mcporter/Chrome/config/daemon missing) → `read skills/chrome-devtools/references/setup.md`
-- **All 29 tools + full signatures** (console, network, performance, memory, emulation, and more) **and server-flag tuning** (`--slim`, `--no-category-*`) → `read skills/chrome-devtools/references/tools.md`
-- **Cookbook workflows** (table scraping, lazy-load, login, SPA debug, perf trace) → `read skills/chrome-devtools/references/recipes.md`
+- **First-run setup** (mcporter/Chrome/config/daemon missing) → `pi.read({ path: "<skill-dir>/references/setup.md" })`
+- **All 29 tools + full signatures** (console, network, performance, memory, emulation, and more) **and server-flag tuning** (`--slim`, `--no-category-*`) → `pi.read({ path: "<skill-dir>/references/tools.md" })`
+- **Cookbook workflows** (table scraping, lazy-load, login, SPA debug, perf trace) → `pi.read({ path: "<skill-dir>/references/recipes.md" })`
 
 Load these only when the task needs them — that's the whole point.
 
 ## Anti-patterns
 
 - ❌ `take_screenshot` to read text/DOM → use `take_snapshot` (cheaper, precise)
-- ❌ `filePath=/tmp/…` on macOS → `Access denied` (canonical `/private/tmp` is outside the root). Use `"$TMPDIR"` → see Screenshots section
+- ❌ `filePath=/tmp/…` on macOS → `Access denied6 (canonical `/private/tmp` is outside the root). Use `"$TMPDIR"` → see Screenshots section
 - ❌ Multiple `fill` calls for one form → use `fill_form` (one round-trip)
 - ❌ Guessing selectors when you have a `uid` → snapshot first, use the uid
 - ❌ **`evaluate_script` for actions** (`.click()`, `.value=`, `scrollTo`) → use `click` / `fill` / `press_key` (real events + snapshot)
 - ❌ Fresh `evaluate_script` for colors/box-model → see the `chrome-css` skill
-- ❌ Calling tools when the daemon is down → check `mcporter daemon status` first
+- ❌ Calling tools when the daemon is down → check `mcp.$servers()` first
 
 ## Troubleshooting
 
-The fix for ~80% of real failures is the same: **restart the daemon** (Chrome is
+The fix for ~80% of real failures is the same: **reload MCP** (Chrome is
 the flaky part, not the MCP).
 
 | Symptom | Fix |
 |---|---|
-| `appears offline` / `Connection closed` | tab/process crashed → `mcporter daemon restart && sleep 3` |
+| `appears offline` / `Connection closed` | tab/process crashed → `await mcp.$reload()` |
 | `Element with uid … not found` | DOM changed since snapshot → `take_snapshot` again, use the fresh uid |
-| `Navigation timeout of 10000 ms exceeded` | slow site → retry `navigate_page` (often lands 2nd try); or raise `timeout=` |
-
-Setup/boot failures (`mcporter: command not found`, daemon won't start,
-`Target closed`, `Cannot find module`) are diagnosed in `references/setup.md` → Phase 5.
+| `Navigation timeout of 10000 ms exceeded` | slow site → retry `navigate_page` (often lands 2nd try); or raise `timeout` |

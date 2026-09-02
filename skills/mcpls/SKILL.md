@@ -1,16 +1,14 @@
 ---
 name: mcpls
 description: >
-  Semantic code navigation via LSP through the mcpls MCP→LSP bridge
-  (mcporter call --stdio mcpls). Find definitions, references, hover types,
-  workspace symbols, diagnostics, call hierarchy, rename refactoring, and
-  completions — all compiler-accurate, not text-level guesses. Use instead of
-  grep/rg when you need to know WHERE a symbol is defined, WHAT type it is,
-  WHO calls a function, or WHAT diagnostics exist — not just find text
-  occurrences. Works with Rust, TypeScript, Python, Go, C/C++, Zig and more.
-  Wraps `mcporter call --stdio mcpls` so the 15-tool schema stays out of
-  context until needed.
-allowed-tools: bash read
+  Semantic code navigation via LSP through the mcpls MCP→LSP bridge.
+  Find definitions, references, hover types, workspace symbols, diagnostics,
+  call hierarchy, rename refactoring, and completions — all compiler-accurate,
+  not text-level guesses. Use instead of grep/rg when you need to know WHERE
+  a symbol is defined, WHAT type it is, WHO calls a function, or WHAT
+  diagnostics exist — not just find text occurrences. Works with Rust,
+  TypeScript, Python, Go, C/C++, Zig and more. Register via `mcp.$register`,
+  call `mcp.mcpls.*` inside `fabric_exec`.
 ---
 
 # mcpls (MCP→LSP bridge)
@@ -19,15 +17,11 @@ Give AI agents compiler-accurate code understanding through Language Server Prot
 type inference, cross-references, semantic navigation, real diagnostics. Single
 Rust binary, no Node.js/Python runtime needed.
 
-See the [mcporter skill](../mcporter/SKILL.md) for mcporter basics (call syntax,
-ad-hoc stdio servers, output control).
-
 ## Prerequisites
 
-```bash
-mcpls --version                              # installed? (cargo install mcpls)
-cd /path/to/project                          # mcpls needs cwd = project root
-mcporter call --stdio mcpls --tool get_server_logs --args '{}'  # smoke test
+```ts
+// mcpls installed? (cargo install mcpls)
+await pi.bash({ cmd: "mcpls --version" });
 ```
 
 Missing? `cargo install mcpls`. Language servers (at least one needed):
@@ -42,6 +36,26 @@ go install golang.org/x/tools/gopls@latest  # Go
 mcpls auto-detects servers from project markers (Cargo.toml, package.json,
 pyproject.toml, go.mod, etc.). Default config at `~/.config/mcpls/mcpls.toml`
 covers all major languages out of the box.
+
+## Register with Fabric
+
+mcpls is an ad-hoc stdio server — register it once per session, then call
+`mcp.mcpls.*` directly:
+
+```ts
+// Register (cwd = project root so mcpls auto-detects workspace markers)
+await mcp.$register({
+  name: "mcpls",
+  command: "mcpls",
+  cwd: process.cwd(),
+});
+
+// Smoke test
+await mcp.mcpls.get_server_logs({});
+```
+
+`$register` creates an ephemeral server in the pooled mcporter runtime. It
+stays available for the rest of the session.
 
 ## When to use
 
@@ -60,87 +74,80 @@ faster and more direct for that.
 
 ## Core workflow
 
-```
-cd to project → mcporter call --stdio mcpls --tool <tool> --args '{"file_path":"<relative>","line":N,"character":N}'
-```
-
 Three rules to get right:
 
-1. **`cd` to the project root first** — mcpls inherits cwd, auto-detects
-   workspace markers from there. Do NOT use `--root` (it's a mcporter flag,
-   not passed through to mcpls).
+1. **Register with `cwd` = project root** — mcpls auto-detects workspace
+   markers from there.
 
 2. **File paths must be relative** to project root. Absolute paths cause
    `"path outside workspace"` errors.
 
 3. **Positions are 1-based** — line 1, character 1 = first character. Use line
-   numbers from `read` / `bat` directly (mcpls translates to 0-based LSP
-   internally).
+   numbers from `pi.read` directly (mcpls translates to 0-based LSP internally).
 
 Minimal example:
 
-```bash
-cd /path/to/project
-mcporter call --stdio mcpls --tool get_hover --args '{"file_path":"src/main.rs","line":10,"character":5}'
+```ts
+await mcp.mcpls.get_hover({ file_path: "src/main.rs", line: 10, character: 5 });
 ```
 
 ## Top tools
 
-All calls follow `cd <project> && mcporter call --stdio mcpls --tool <tool> --args '<json>'`.
+All calls are `mcp.mcpls.<tool>(args)` inside `fabric_exec`.
 
 ### Code Intelligence
 
-```bash
-# What type/signature is at this position?
-mcporter call --stdio mcpls --tool get_hover --args '{"file_path":"src/lib.rs","line":42,"character":8}'
+```ts
+// What type/signature is at this position?
+await mcp.mcpls.get_hover({ file_path: "src/lib.rs", line: 42, character: 8 });
 
-# Jump to definition
-mcporter call --stdio mcpls --tool get_definition --args '{"file_path":"src/main.rs","line":15,"character":20}'
+// Jump to definition
+await mcp.mcpls.get_definition({ file_path: "src/main.rs", line: 15, character: 20 });
 
-# Find all references across the workspace
-mcporter call --stdio mcpls --tool get_references --args '{"file_path":"src/handler.rs","line":30,"character":12}'
+// Find all references across the workspace
+await mcp.mcpls.get_references({ file_path: "src/handler.rs", line: 30, character: 12 });
 
-# Structured outline of a file (functions, types, imports)
-mcporter call --stdio mcpls --tool get_document_symbols --args '{"file_path":"src/lib.rs"}'
+// Structured outline of a file (functions, types, imports)
+await mcp.mcpls.get_document_symbols({ file_path: "src/lib.rs" });
 
-# Search for a symbol by name across the entire workspace
-mcporter call --stdio mcpls --tool workspace_symbol_search --args '{"query":"process_request"}'
+// Search for a symbol by name across the entire workspace
+await mcp.mcpls.workspace_symbol_search({ query: "process_request" });
 
-# Context-aware completions at a position
-mcporter call --stdio mcpls --tool get_completions --args '{"file_path":"src/app.ts","line":50,"character":4}'
+// Context-aware completions at a position
+await mcp.mcpls.get_completions({ file_path: "src/app.ts", line: 50, character: 4 });
 ```
 
 ### Diagnostics & Refactoring
 
-```bash
-# Real compiler errors and warnings (file MUST be saved to disk first)
-mcporter call --stdio mcpls --tool get_diagnostics --args '{"file_path":"src/lib.rs"}'
+```ts
+// Real compiler errors and warnings (file MUST be saved to disk first)
+await mcp.mcpls.get_diagnostics({ file_path: "src/lib.rs" });
 
-# Quick fixes available at a position (after seeing diagnostics)
-mcporter call --stdio mcpls --tool get_code_actions --args '{"file_path":"src/lib.rs","line":42,"character":8}'
+// Quick fixes available at a position (after seeing diagnostics)
+await mcp.mcpls.get_code_actions({ file_path: "src/lib.rs", line: 42, character: 8 });
 
-# Workspace-wide rename (prefer over manual find-and-replace)
-mcporter call --stdio mcpls --tool rename_symbol --args '{"file_path":"src/lib.rs","line":20,"character":5,"new_name":"new_function_name"}'
+// Workspace-wide rename (prefer over manual find-and-replace)
+await mcp.mcpls.rename_symbol({ file_path: "src/lib.rs", line: 20, character: 5, new_name: "new_function_name" });
 
-# Auto-format document
-mcporter call --stdio mcpls --tool format_document --args '{"file_path":"src/lib.rs"}'
+// Auto-format document
+await mcp.mcpls.format_document({ file_path: "src/lib.rs" });
 ```
 
 ### Call Hierarchy
 
-```bash
-# Step 1: get call hierarchy items at a position
-mcporter call --stdio mcpls --tool prepare_call_hierarchy --args '{"file_path":"src/lib.rs","line":25,"character":1}'
-# Returns a call hierarchy item — pass it to:
-#   get_incoming_calls  — who calls this function? (consumers)
-#   get_outgoing_calls  — what does this function call? (dependencies)
+```ts
+// Step 1: get call hierarchy items at a position
+const items = await mcp.mcpls.prepare_call_hierarchy({ file_path: "src/lib.rs", line: 25, character: 1 });
+// Returns a call hierarchy item — pass it to:
+//   get_incoming_calls  — who calls this function? (consumers)
+//   get_outgoing_calls  — what does this function call? (dependencies)
 ```
 
 ### Server Monitoring
 
-```bash
-# Debug "no results" issues
-mcporter call --stdio mcpls --tool get_server_logs --args '{}'
+```ts
+// Debug "no results" issues
+await mcp.mcpls.get_server_logs({});
 ```
 
 ## ⚠️ Rust indexing caveat — read before using on Rust projects
@@ -189,8 +196,6 @@ After editing a file:
 ## Anti-patterns
 
 - ❌ Using absolute file paths → `"path outside workspace"`. Use relative paths.
-- ❌ Using `--root` flag in mcporter → it's a mcporter flag, not passed to
-  mcpls. `cd` to project instead.
 - ❌ Calling `get_hover` / `get_definition` / `get_references` on Rust files
   immediately after cold start without warmup → empty results `[]`.
 - ❌ Calling `get_diagnostics` before saving the file → stale results.
@@ -202,7 +207,7 @@ After editing a file:
 
 | Symptom | Fix |
 |---|---|
-| `"path outside workspace"` | Use a relative path (from project root). `cd` to project first. |
+| `"path outside workspace"` | Use a relative path (from project root). Register with correct `cwd`. |
 | `"LSP server not available for file type"` | No server configured for that file extension. Install the language server (see Prerequisites). |
 | Empty `[]` from Rust `get_definition` / `get_references` | rust-analyzer is still indexing. Wait 20-30s and retry. Check `get_server_logs`. |
 | `get_diagnostics` returns stale errors | Save the file to disk first. Diagnostics reflect disk state. |
