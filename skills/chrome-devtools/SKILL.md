@@ -19,19 +19,12 @@ surface. All calls are type-checked TypeScript inside `fabric_exec` — no
 ## Prerequisites
 
 ```ts
-// Check MCP servers are loaded
-await mcp.$servers();
-// Smoke test — list pages
+// Smoke test — list pages (first call may time out on cold start, see Troubleshooting)
 await mcp.chrome_devtools.list_pages({});
 ```
 
 Missing or broken? See `<skill-dir>/references/setup.md` (inventory → repair →
-smoke test). If calls fail with `appears offline` / `Connection closed`, reload
-MCP:
-
-```ts
-await mcp.$reload();
-```
+smoke test).
 
 ## When to use
 
@@ -50,8 +43,12 @@ list_pages → select_page → navigate_page → take_snapshot → (act) → ver
 1. **`take_snapshot`** is your eyes — the a11y tree with a `uid` per element.
    Prefer it over `take_screenshot` (text is cheaper and more precise than pixels).
 2. **`uid`** from the snapshot addresses elements in `click` / `fill` / `hover`.
-3. After any action, re-snapshot — uids change when the DOM changes. Pass
-   `includeSnapshot: true` on click/fill to get the fresh tree in the same call.
+   Only a11y-tree elements get a uid — a plain `<span>` (even with `aria-label`)
+   is invisible. Give decorative icons `role="img"` (or `role="button"`) so they
+   can be targeted — this is also correct a11y.
+3. After any action, re-snapshot — the uid prefix changes with EVERY new
+   snapshot (not only on DOM change), so never reuse uids from an old snapshot.
+   Pass `includeSnapshot: true` on click/fill to get the fresh tree in the same call.
 
 ### ⚠️ Use the semantic tool, not `evaluate_script`
 
@@ -74,28 +71,31 @@ list_pages → select_page → navigate_page → take_snapshot → (act) → ver
 All calls are `mcp.chrome_devtools.<tool>(args)` inside `fabric_exec`.
 
 ```ts
-// Navigate
-await mcp.chrome_devtools.navigate_page({ type: "url", url: "https://example.com" });
+// Navigate — all page tools require pageId (get it from list_pages)
+await mcp.chrome_devtools.navigate_page({ pageId: 1, type: "url", url: "https://example.com" });
 await mcp.chrome_devtools.new_page({ url: "https://example.com" });
-await mcp.chrome_devtools.navigate_page({ type: "reload", ignoreCache: true });
+await mcp.chrome_devtools.navigate_page({ pageId: 1, type: "reload", ignoreCache: true });
 
 // See — snapshot (a11y tree, primary view) or screenshot (colors/layout)
-await mcp.chrome_devtools.take_snapshot({});
-await mcp.chrome_devtools.take_snapshot({ verbose: true });
+await mcp.chrome_devtools.take_snapshot({ pageId: 1 });
+await mcp.chrome_devtools.take_snapshot({ pageId: 1, verbose: true });
 const tmp = (await pi.bash({ cmd: "echo $TMPDIR" })).output.trim();
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
 
 // Interact (need a uid from a snapshot)
 await mcp.chrome_devtools.click({ pageId: 1, uid: "1_5", includeSnapshot: true });
-await mcp.chrome_devtools.fillFills({ pageId: 1, uid: "1_7", value: "hello" });
+await mcp.chrome_devtools.fill({ pageId: 1, uid: "1_7", value: "hello" });
 await mcp.chrome_devtools.fill_form({ pageId: 1, elements: [{ uid: "1_7", value: "user" }, { uid: "1_8", value: "pass" }] });
 await mcp.chrome_devtools.hover({ pageId: 1, uid: "1_3" });
 await mcp.chrome_devtools.press_key({ pageId: 1, key: "Enter" });
 await mcp.chrome_devtools.wait_for({ pageId: 1, text: ["Welcome", "Error"] });
 
 // Evaluate JS — read state, returns JSON.
+// No `awaitPromise` argument (that's the Playwright API — it is rejected);
+// to wait, RETURN a promise from the function; it will be awaited.
+// Valid args: pageId, function, args, filePath, dialogAction, waitForStableDom.
 await mcp.chrome_devtools.evaluate_script({ pageId: 1, function: "() => document.title" });
-await mcp.chrome_devtools.evaluate_script({ pageId: 1, function: '() => ({ h1: document.querySelector("h1")?.innerText, links: document.querySelectorAll("a\4.length })' });
+await mcp.chrome_devtools.evaluate_script({ pageId: 1, function: '() => fetch("/api/x").then(r => r.json()).then(j => ({ total: j.totalCount }))' });
 
 // Pages
 await mcp.chrome_devtools.list_pages({});
@@ -146,7 +146,21 @@ await pi.read({ path: `${tmp}/page.png` });  // displays inline
 
 `uid: "1_5"` screenshots **just that element** (clipped to its bounding box).
 Without `uid`, you get the **current viewport**. `fullPage: true` captures the
-entire scrollable page (incompatible with `uid`).> 
+entire scrollable page (incompatible with `uid`).
+
+## Pitfalls
+
+- **`get_network_request` truncates large response bodies** (~10KB observed of a
+  29KB body). A field missing from the captured slice is NOT evidence it is
+  absent — verify by re-fetching in page context:
+  `evaluate_script` with `() => fetch(url).then(r => r.json()).then(j => j.field)`.
+- **HMR staleness**: after editing frontend code, hard-reload
+  (`navigate_page { type: "reload", ignoreCache: true }`) before measuring — HMR
+  propagation to the open tab is unreliable, and measurements on the stale
+  bundle give false "fix didn't work" conclusions.
+- **DOM text probes false-negative on tooltips/popovers**: text nodes may have
+  children, so `e.children.length === 0 && textContent === X` misses them. For
+  "is text X rendered?" checks, trust the screenshot or scrollWidth metrics.
 ## When you need more
 
 - **First-run setup** (mcporter/Chrome/config/daemon missing) → `pi.read({ path: "<skill-dir>/references/setup.md" })`
@@ -158,20 +172,21 @@ Load these only when the task needs them — that's the whole point.
 ## Anti-patterns
 
 - ❌ `take_screenshot` to read text/DOM → use `take_snapshot` (cheaper, precise)
-- ❌ `filePath=/tmp/…` on macOS → `Access denied6 (canonical `/private/tmp` is outside the root). Use `"$TMPDIR"` → see Screenshots section
+- ❌ `filePath=/tmp/…` on macOS → `Access denied` (canonical `/private/tmp` is outside the root). Use `"$TMPDIR"` → see Screenshots section
 - ❌ Multiple `fill` calls for one form → use `fill_form` (one round-trip)
 - ❌ Guessing selectors when you have a `uid` → snapshot first, use the uid
 - ❌ **`evaluate_script` for actions** (`.click()`, `.value=`, `scrollTo`) → use `click` / `fill` / `press_key` (real events + snapshot)
 - ❌ Fresh `evaluate_script` for colors/box-model → see the `chrome-css` skill
-- ❌ Calling tools when the daemon is down → check `mcp.$servers()` first
+- ❌ First-call `MCP error -32001: Request timed out` → cold start, not a crash → wait ~8s and retry
 
 ## Troubleshooting
 
-The fix for ~80% of real failures is the same: **reload MCP** (Chrome is
-the flaky part, not the MCP).
+Most failures are cold starts or stale uids, not crashes. There is **no**
+`mcp.$reload()` in the fabric build — the recovery is **wait and retry**.
 
 | Symptom | Fix |
 |---|---|
-| `appears offline` / `Connection closed` | tab/process crashed → `await mcp.$reload()` |
-| `Element with uid … not found` | DOM changed since snapshot → `take_snapshot` again, use the fresh uid |
+| `MCP error -32001: Request timed out` on first call after idle | cold start (`npx -y chrome-devtools-mcp@latest` + Chrome launch) → wait ~8s, retry; the server stays up afterwards |
+| `appears offline` / `Connection closed` | tab/process crashed → retry `list_pages`; if persistent, see setup.md |
+| `Element with uid … not found` | stale uid, or element missing from the a11y tree (add a `role`) → `take_snapshot` again, use the fresh uid |
 | `Navigation timeout of 10000 ms exceeded` | slow site → retry `navigate_page` (often lands 2nd try); or raise `timeout` |
