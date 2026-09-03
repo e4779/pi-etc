@@ -105,6 +105,10 @@ await mcp.chrome_devtools.close_page({ pageId: 2 });
 
 ## Screenshots — where to save & how to read
 
+> **Prefer `take_snapshot` for verification** — the a11y tree text is cheaper, more precise,
+> and doesn't need a vision-capable model. Use screenshots only when you need to see
+> colors/layout/visual regressions.
+
 `take_screenshot` writes to `filePath`. **The path must be inside an allowed
 workspace root**, otherwise you get `Access denied: path … is not within any of
 the configured workspace roots`.
@@ -139,7 +143,10 @@ await mcp.chrome_devtools.take_screenshot({ pageId: 1, format: "jpeg", quality: 
 After saving, `pi.read` the file to see it:
 
 ```ts
-await pi.read({ path: `${tmp}/page.png` });  // displays inline
+await pi.read({ path: `${tmp}/page.png` });  // displays inline IF model is vision-capable
+// ⚠️ Non-vision models (e.g. GLM-5.2) get "tool image omitted: model does not support images".
+//    Use a vision-capable model (Qwen3.8-27B) or delegate to pixso-analyst actor to read it.
+//    For most verification, take_snapshot (a11y text) is sufficient and doesn't need vision.
 ```
 
 ### Element screenshots vs full page
