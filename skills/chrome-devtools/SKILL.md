@@ -40,6 +40,23 @@ JS-rendered pages.
 list_pages → select_page → navigate_page → take_snapshot → (act) → verify
 ```
 
+### ⚠️ Seven times measure, once cut — check the schema before you call
+
+> The stupidest question is the one you didn't ask. `tools.describe` is free,
+> hallucinated args are not. A 2-second check beats a 20-minute debugging detour.
+
+Before using **any** tool you haven't called in this session, check its live
+schema — it is always more current than any static doc:
+
+```ts
+// One call, full schema: types, enums, defaults, required fields
+await tools.describe({ ref: "mcp.chrome_devtools.take_screenshot" });
+```
+
+Do this especially after updating the MCP package — tools are added/renamed
+between versions. The schema is the source of truth; this skill documents only
+what the schema *cannot* tell you (gotchas, pi-specific wiring, behavioral traps).
+
 1. **`take_snapshot`** is your eyes — the a11y tree with a `uid` per element.
    Prefer it over `take_screenshot` (text is cheaper and more precise than pixels).
 2. **`uid`** from the snapshot addresses elements in `click` / `fill` / `hover`.
@@ -140,13 +157,23 @@ await mcp.chrome_devtools.take_screenshot({ pageId: 1, format: "jpeg", quality: 
 
 ### How to view the screenshot
 
-After saving, `pi.read` the file to see it:
+`pi.read` the file — but **only vision-capable models see images**. Non-vision
+models (e.g. GLM-5.2) get `tool image omitted: model does not support images`.
+
+> **If you can't see, ask someone who can.** Delegate to a vision-capable
+> sub-agent (`pixso-analyst`, model Qwen3.8-27B) via `agents.ask`, or ask
+> the user. Don't guess what a screenshot shows — either see it or have it
+> described to you.
 
 ```ts
-await pi.read({ path: `${tmp}/page.png` });  // displays inline IF model is vision-capable
-// ⚠️ Non-vision models (e.g. GLM-5.2) get "tool image omitted: model does not support images".
-//    Use a vision-capable model (Qwen3.8-27B) or delegate to pixso-analyst actor to read it.
-//    For most verification, take_snapshot (a11y text) is sufficient and doesn't need vision.
+// You (vision model): pi.read directly
+await pi.read({ path: `${tmp}/page.png` });
+
+// You (non-vision): delegate to a seeing actor
+await agents.ask({ id: "pixso-analyst", message: `Read ${tmp}/page.png and describe the layout` });
+
+// For most verification, skip screenshots entirely — take_snapshot (a11y text)
+// is sufficient and doesn't need vision.
 ```
 
 ### Element screenshots vs full page
@@ -171,7 +198,7 @@ entire scrollable page (incompatible with `uid`).
 ## When you need more
 
 - **First-run setup** (mcporter/Chrome/config/daemon missing) → `pi.read({ path: "<skill-dir>/references/setup.md" })`
-- **All 29 tools + full signatures** (console, network, performance, memory, emulation, and more) **and server-flag tuning** (`--slim`, `--no-category-*`) → `pi.read({ path: "<skill-dir>/references/tools.md" })`
+- **Tool schemas** → `tools.describe({ ref: "mcp.chrome_devtools.<tool>" })` — live, always current. Don't read static tool lists.
 - **Cookbook workflows** (table scraping, lazy-load, login, SPA debug, perf trace) → `pi.read({ path: "<skill-dir>/references/recipes.md" })`
 
 Load these only when the task needs them — that's the whole point.

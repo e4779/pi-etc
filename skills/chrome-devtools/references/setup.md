@@ -206,3 +206,19 @@ console.log("removed chrome-devtools from",p);
 '
 ```
 Chrome itself and `mcporter` are left installed (other tools may depend on them).
+
+## Tuning the tool surface (server flags)
+
+The MCP ships more tools than most tasks need. Trim it in `~/.mcporter/mcporter.json`
+(then `mcporter daemon restart`):
+
+- **`--slim`** — radical: just 3 tools (`navigate`, `evaluate`, `screenshot`). Best for pure scraping.
+- **`--no-category-network` / `--no-category-performance` / `--no-category-emulation`** — granular: drop whole categories you don't use, keep the rest.
+- **`--screenshotFormat jpeg --screenshotMaxWidth 1280`** — smaller screenshots = less context.
+- **`--experimentalVision`** — enables `click_at(x, y)` (coordinate clicks, no uid needed; needs a vision-capable model).
+
+Confirm what's live with `mcporter list chrome-devtools --brief` or `tools.list` inside fabric_exec.
+
+The tool set also depends on the installed `chrome-devtools-mcp` version — upgrade
+with `chrome-devtools-mcp@latest` to get new tools. If a tool exists on your box but
+isn't documented, trust `tools.describe` — it is always current.
