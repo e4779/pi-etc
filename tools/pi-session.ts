@@ -136,11 +136,9 @@ function loadEntries(path: string): SessionEntry[] {
         const obj = JSON.parse(firstLine);
         // Check for pisub log: has ts + type in the known event types
         if ("ts" in obj && "type" in obj && typeof obj.type === "string" && PISUB_EVENT_TYPES.has(obj.type)) {
-          const name = basename(path).replace(/\.log$/, "");
           console.error(`pi-session: '${path}' is a pisub RPC event log, not a pi session.`);
           console.error(`  SessionManager.open() would TRUNCATE it — refusing.`);
-          console.error(`  Inspect it with: pisub log ${name} | pisub report ${name} | pisub grep ${name} <text>`);
-          console.error(`  (name = filename without .log)`);
+          console.error(`  Inspect the NDJSON directly with rg/jq.`);
           process.exit(2);
         }
       } catch {
@@ -178,7 +176,7 @@ function loadEntries(path: string): SessionEntry[] {
       if (sizeAfter !== sizeBefore) {
         console.error(`pi-session: WARNING — '${path}' changed from ${sizeBefore} to ${sizeAfter} bytes`);
         console.error(`  during SessionManager.open(). It was not a valid pi session. The original`);
-        console.error(`  content was backed up to '${path}.bak'. This indicates a pisub log or`);
+        console.error(`  content was backed up to '${path}.bak'. This indicates a legacy pisub log or`);
         console.error(`  other non-session file that the B1 detector missed — please report it`);
         console.error(`  so the detector can be extended.`);
         // keep .bak — user needs it

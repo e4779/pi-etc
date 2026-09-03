@@ -39,7 +39,6 @@ default). Either:
 {
   "source": "git:git@gitverse.ru:e4779/pi-etc.git",
   "extensions": [
-    "extensions/pi-way.ts",
     "extensions/lint-check/index.ts"   // ← add this line
   ],
   // ...skills etc.

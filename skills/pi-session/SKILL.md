@@ -4,11 +4,7 @@ description: "Parse and inspect pi agent session JSONL files. Commands: --summar
 ---
 
 **Scope:** pi-session inspects **pi agent sessions** only — files in
-`~/.pi/agent/sessions/`. It does NOT read pisub RPC logs
-(`~/.pisub/agents/*.log`); those use a different schema and running
-pi-session on them would truncate the file. For pisub logs use `pisub log
-<name>`, `pisub report <name>`, or inspect the NDJSON directly with
-`rg`/`jq` (see pisub SKILL.md "Log format & inspection").
+`~/.pi/agent/sessions/`. It refuses foreign NDJSON/JSONL files (different schema — the pi SDK's `SessionManager.open()` would truncate them; legacy pisub logs in `~/.pisub/agents/` are the known case). Inspect such files directly with `rg`/`jq`.
 
 The `pi-session` tool parses pi agent session JSONL files using the pi agent SDK — always in sync with pi's format.
 

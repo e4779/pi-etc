@@ -33,7 +33,7 @@ export default function (pi: ExtensionAPI) {
   // ---- State ----
   let qwenEnabled = false;
   let legacyEditRegistered = false;
-  // Fabric full-code detection is shared with pi-way: ../lib/fabric-detect.ts
+  // Fabric full-code detection: ../lib/fabric-detect.ts
 
   // ---- Hook: session_start (remind about /qwen-flavor for Qwen models) ----
   pi.on("session_start", async (event, ctx) => {

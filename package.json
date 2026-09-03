@@ -10,10 +10,8 @@
   "type": "module",
   "pi": {
     "extensions": [
-      "./extensions/pi-way.ts",
       "./extensions/qwen/index.ts",
-      "./extensions/lint-check/index.ts",
-      "./extensions/rlm-way/index.ts"
+      "./extensions/lint-check/index.ts"
     ],
     "skills": [
       "./skills"
@@ -25,7 +23,6 @@
   "author": "e41q",
   "license": "ISC",
   "dependencies": {
-    "@runtimed/node": "^0.5.6",
     "diff": "^5.2.0",
     "nano-staged": "^1.0.2"
   },

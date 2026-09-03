@@ -21,7 +21,6 @@ pi install ~/dev/pi-etc -l
 
 | Расширение | Файл | Описание |
 |---|---|---|
-| **pi-way** | `extensions/pi-way.ts` | Инжектит принципы pi-way в системный промпт каждого сеанса |
 | **lint-check** | `extensions/lint-check/index.ts` | Запускает линтеры через nano-staged после каждого хода агента |
 | **qwen-flavor** | `extensions/qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
 | **co-author** | `extensions/co-author/index.ts` | Автоматически добавляет `Co-authored-by:` trailer к `git commit` по текущей модели. Маппинг model.id → identity в `~/.pi/agent/coauthors.json`, fallback — выводится из model.id |
@@ -30,23 +29,20 @@ pi install ~/dev/pi-etc -l
 
 | Скилл | Команда | Описание |
 |---|---|---|
-| **pi-way** | `/skill:pi-way` | Философия pi: саб-агенты, Makefile, PLAN.md/TODO.md, tmux |
 | **pi-session** | `/skill:pi-session` | Парсинг и инспекция JSONL-сессий pi агента (summary, grep, context, timeline) |
-| **pisub** | `/skill:pisub` | Суб-агенты через tmux + RPC: spawn/send/steer/wait/report/run |
-| **deepthink** | `/skill:deepthink` | Tree-of-Thoughts для сложных решений |
+| **github** | `/skill:github` | GitHub через github MCP: поиск репо/кода/issue, PR, ревью, мердж |
+| **mcporter** | `/skill:mcporter` | Обзор mcporter CLI: discovery, вызов и управление MCP-серверами из терминала |
 | **layout-check** | `/skill:layout-check` | Верификация CSS-вёрстки через Chrome DevTools |
 | **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP (без раздувания контекста на 18k токенов) |
 | **zai-mcp** | `/skill:zai-mcp` | Веб-поиск, страница→markdown, семантическое чтение GitHub-репо, OCR/анализ изображений и видео через 4 Z.AI MCP сервера |
-| **lsp-cli** | `/skill:lsp-cli` | Семантическая навигация по коду через LSP из терминала (определения, ссылки, символы, диагностики). Поддерживает TypeScript, Python, Go, Rust, C/C++ и любой LSP-совместимый сервер. Альтернатива grep/rg |
+| **mcpls** | `/skill:mcpls` | Семантическая навигация по коду через LSP (mcpls MCP→LSP мост): определения, ссылки, символы, диагностики, ренейм-рефакторинг |
 
 ### Утилиты (`tools/`, `bin/`)
 
 | Инструмент | Назначение |
 |---|---|
 | `tools/pi-session.ts` | CLI для инспекции сессий: `npx tsx tools/pi-session.ts --summary` |
-| `bin/tot-add` | Добавить ветку в дерево размышлений |
-| `bin/tot-status` | Показать незавершённые ветки |
-| `bin/tot-tree` | Отрисовать paths.txt как ASCII-дерево |
+
 
 ## Селективное включение
 
@@ -65,7 +61,7 @@ pi install ~/dev/pi-etc -l
 
 Без фильтрации — pi загрузит все расширения из `extensions/**/*.ts` и все скиллы из `skills/`.
 
-### Пример 2: только pi-way и qwen
+### Пример 2: только qwen
 
 ```json
 {
@@ -73,7 +69,6 @@ pi install ~/dev/pi-etc -l
     {
       "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "extensions": [
-        "extensions/pi-way.ts",
         "extensions/qwen/index.ts"
       ]
     }
@@ -105,7 +100,7 @@ pi install ~/dev/pi-etc -l
       "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "skills": [
         "layout-check",
-        "deepthink"
+        "zai-mcp"
       ]
     }
   ]
@@ -120,7 +115,6 @@ pi install ~/dev/pi-etc -l
     {
       "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "extensions": [
-        "extensions/pi-way.ts",
         "extensions/qwen/index.ts"
       ]
     },
@@ -153,7 +147,7 @@ npm install
 npx tsc --noEmit
 
 # Тестировать локально (без установки)
-pi -e ~/dev/pi-etc/extensions/pi-way.ts
+pi -e ~/dev/pi-etc/extensions/qwen/index.ts
 ```
 
 ## Структура
@@ -161,38 +155,33 @@ pi -e ~/dev/pi-etc/extensions/pi-way.ts
 ```
 pi-etc/
 ├── extensions/           # Расширения (одно .ts на расширение или вложенная директория)
+│   ├── co-author/
+│   ├── lib/                   # общие хелперы (fabric-detect.ts и др.)
 │   ├── lint-check/
 │   │   ├── index.ts
 │   │   └── README.md
-│   ├── pi-way.ts
 │   └── qwen/
 │       ├── index.ts
 │       ├── system-prompt.ts
 │       ├── edit-qwen.ts
 │       └── tool-call-extractor.ts
 ├── skills/               # Скиллы (SKILL.md в поддиректориях)
-│   ├── pi-way/SKILL.md
 │   ├── pi-session/SKILL.md
-│   ├── pisub/SKILL.md
-│   ├── deepthink/SKILL.md
+│   ├── github/SKILL.md
 │   ├── layout-check/
 │   │   ├── SKILL.md
 │   │   └── scripts/layoutProbe.mjs
 │   ├── chrome-devtools/
 │   │   ├── SKILL.md
 │   │   └── references/         # setup/tools/recipes — грузятся по требованию
-│   ├── lsp-cli/
-│   │   └── SKILL.md
+│   ├── mcporter/SKILL.md
+│   ├── mcpls/SKILL.md
 │   └── zai-mcp/
 │       ├── SKILL.md
 │       └── references/           # tools.md (13 tools) + recipes.md (7 сценариев)
 ├── tools/                # CLI-утилиты
 │   ├── pi-session.ts          # инспекция сессий (--summary, --grep, --context, --timeline)
-│   └── pisub.ts               # суб-агенты: spawn/send/steer/wait/report/run
-├── bin/                  # Shell-скрипты
-│   ├── tot-add
-│   ├── tot-status
-│   └── tot-tree
+│   └── pi-session.README.md
 ├── themes/               # Темы (пока пусто)
 ├── package.json
 ├── tsconfig.json
