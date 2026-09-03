@@ -7,17 +7,14 @@
 
 ## Open work
 
-### Track D — upstream: SessionManager.open() silently truncates non-session files (earendil-works/pi#6002)
-
-Filed 2026-06-23; auto-closed `not_planned` on submission (expected for new
-contributors per CONTRIBUTING — maintainers review daily and reopen worthwhile
-reports). Root cause + repro live in `docs/upstream-issue-draft.md`; local
-mitigations (content detector + `.bak` backup) are in `tools/pi-session.ts`.
-
-- [ ] Watch for maintainer triage; if reopened → add the AI-assistance
-      disclosure comment per CONTRIBUTING
+_(пусто — предложить что-нибудь, если выжило меньше одной сессии, место не здесь)_
 
 ---
+
+## Closed 2026-09-03 — upstream #6002: SessionManager.open() truncation
+
+Fixed & closed upstream (accepted our report from `docs/upstream-issue-draft.md`).
+Local mitigations stay in `tools/pi-session.ts` (content detector + `.bak`).
 
 ## Removed 2026-09-03 — pi-way, pisub, rlm-way, deepthink (+ bin/tot-*)
 
