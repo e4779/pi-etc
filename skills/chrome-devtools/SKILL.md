@@ -38,6 +38,14 @@ Chrome via mirrored networking, where `127.0.0.1` is shared between both:
 Two instances = two windows on the Windows desktop: watch the direct one for
 real rendering, the proxied one for blocked-site work.
 
+Proxy discipline (never open RU domains through 9223 — detection exposure) lives in
+the GLOBAL `~/.pi/agent/AGENTS.md`, not here: it applies to every tool, not
+just this skill.
+
+Cold start of the mb-profile instance may restore many tabs and wedge early
+MCP calls for a minute or two; if `list_pages` hangs, wait for the profile to
+settle or restart the instance.
+
 ## Prerequisites
 
 ```ts
