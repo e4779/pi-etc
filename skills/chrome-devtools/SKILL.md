@@ -16,6 +16,28 @@ Drive a real Chrome tab through the `chrome-devtools` MCP via Fabric's `mcp.*`
 surface. All calls are type-checked TypeScript inside `fabric_exec` — no
 `mcporter call` CLI, no process spawn.
 
+## WSL → Windows Chrome (mirrored networking)
+
+Desktop Chrome binds CDP to loopback only — `--remote-debugging-address` is
+silently ignored (verified on Chrome 151). So from WSL, drive the *Windows*
+Chrome via mirrored networking, where `127.0.0.1` is shared between both:
+
+- `C:\Users\e41q\.wslconfig` → `[wsl2] networkingMode=mirrored` (applies
+  after `wsl --shutdown`).
+- Launch (from Windows or via interop — see below): `chrome-debug.ps1` →
+  port **9222** direct; `chrome-debug-proxy.ps1` → port **9223** through the
+  bypass proxy `<proxy-host>:8888` (profile `chrome-mb-profile`,
+  anti-automation-detection flags). Both live in `C:\Users\e41q\.local\bin\`.
+- WSL `~/.mcporter/mcporter.json` maps `chrome-devtools` /
+  `chrome-devtools-proxy` to `--browserUrl http://127.0.0.1:922X`.
+- Interop: the agent can spawn/kill Windows Chrome straight from WSL —
+  `powershell.exe -NoProfile -Command "$p = Start-Process ... -PassThru; $p.Id"`
+  captures the PID; `taskkill.exe /PID <pid> /T /F` cleans up.
+- Verify: `curl -s http://127.0.0.1:9222/json/version`.
+
+Two instances = two windows on the Windows desktop: watch the direct one for
+real rendering, the proxied one for blocked-site work.
+
 ## Prerequisites
 
 ```ts
