@@ -1,226 +1,179 @@
 # GitHub MCP — Write Operations
 
 > **Patterns for mutating GitHub state.** All operations require auth via
-> `GITHUB_PERSONAL_ACCESS_TOKEN` in the server's `env` block.
-
-All calls: `mcporter call github.<tool> key=value ...`
+> `GITHUB_PERSONAL_ACCESS_TOKEN` in the server's `env` block. All calls are
+> fabric natives: `await mcp.github.<tool>({ ... })` inside `fabric_exec`.
 
 ---
 
 ## Create an issue
 
-```bash
-mcporter call github.create_issue owner=owner repo=myrepo \
-  title="Bug: authentication fails after timeout" \
-  body="### Steps to reproduce\n\n1. Login\n2. Wait 30 minutes\n3. Try to access /api/profile\n\n### Expected\nSession remains valid.\n\n### Actual\n401 Unauthorized." \
-  labels='["bug","high-priority"]' \
-  assignees='["developer-username"]'
+```ts
+await mcp.github.issue_write({
+  method: "create",
+  owner: "owner", repo: "myrepo",
+  title: "Bug: authentication fails after timeout",
+  body: "### Steps to reproduce\n\n1. Login\n2. Wait 30 minutes\n3. Try /api/profile\n\n### Actual\n401 Unauthorized.",
+  labels: ["bug", "high-priority"],
+  assignees: ["developer-username"],
+});
 ```
 
-**Params:** `owner`, `repo`, `title` (required); `body`, `assignees`, `labels`,
-`milestone` (optional).
+**Params:** `method: "create"`, `owner`, `repo` (required); `title`, `body`,
+`labels`, `assignees`, `milestone`, `type` (optional).
 
----
+## Update an issue / close it
+
+```ts
+await mcp.github.issue_write({
+  method: "update",
+  owner: "owner", repo: "myrepo", issue_number: 42,
+  state: "closed", state_reason: "completed",
+});
+```
+
+`issue_number` selects the target; `state: "open" \| "closed"`.
 
 ## Comment on an issue
 
-```bash
-mcporter call github.add_issue_comment owner=owner repo=myrepo issue_number=42 \
-  body="I can reproduce this. Here's the error log:\n\n```\nError: timeout at line 123\n```"
+```ts
+await mcp.github.add_issue_comment({
+  owner: "owner", repo: "myrepo", issue_number: 42,
+  body: "I can reproduce this. Here's the error log:\n\n```\nError: timeout at line 123\n```",
+});
 ```
 
 **Params:** `owner`, `repo`, `issue_number`, `body` (all required).
-
----
+Optional: `comment_id` (reply), `reaction`.
 
 ## Create a branch
 
-```bash
-mcporter call github.create_branch owner=owner repo=myrepo \
-  branch=feature-new-endpoint
-
-mcporter call github.create_branch owner=owner repo=myrepo \
-  branch=feature-new-endpoint from_branch=dev  # from specific branch
+```ts
+await mcp.github.create_branch({
+  owner: "owner", repo: "myrepo", branch: "feature-new-endpoint",
+});
 ```
-
-**Params:** `owner`, `repo`, `branch` (required); `from_branch` (optional,
-defaults to repo default branch).
-
----
 
 ## Create a file (new file)
 
-```bash
-mcporter call github.create_or_update_file \
-  owner=owner repo=myrepo path=docs/api.md \
-  content="# API Documentation\n\n..." \
-  message="docs: add API documentation" \
-  branch=main
+```ts
+await mcp.github.create_or_update_file({
+  owner: "owner", repo: "myrepo", path: "docs/api.md",
+  content: "# API Documentation\n\n...",
+  message: "docs: add API documentation",
+  branch: "main",
+});
 ```
 
-**No `sha` needed** for new files. The file is created at the given path.
+**No `sha` needed** for new files.
 
----
+## Update a file (existing) — the `sha` gotcha
 
-## Update a file (existing file) — the `sha` gotcha
+**The pattern:** read the file first to extract its SHA, then write with that
+SHA. GitHub requires it to detect conflicts and prevent accidental overwrites.
 
-**The pattern:** get the file first to extract its SHA, then update with that
-SHA. GitHub requires the SHA to detect conflicts and prevent accidental
-overwrites.
+```ts
+// Step 1: get the file to extract the SHA
+const cur = await mcp.github.get_file_contents({
+  owner: "owner", repo: "myrepo", path: "README.md" });
+const sha = (cur.structuredContent ?? cur)?.sha;
 
-```bash
-# Step 1: get the file to extract the SHA
-SHA=$(mcporter call github.get_file_contents owner=owner repo=myrepo path=README.md | \
-  jq -r '.sha')
-
-# Step 2: update with the SHA
-mcporter call github.create_or_update_file \
-  owner=owner repo=myrepo path=README.md \
-  content="# My Project\nUpdated content..." \
-  message="docs: update README" \
-  branch=main \
-  sha="$SHA"
+// Step 2: update with the SHA
+await mcp.github.create_or_update_file({
+  owner: "owner", repo: "myrepo", path: "README.md",
+  content: "# My Project\nUpdated content...",
+  message: "docs: update README",
+  branch: "main",
+  sha,
+});
 ```
 
-**Without the `sha` param**, the call fails with "SHA of the file being
-replaced is required when updating existing files."
-
----
+**Without `sha`** the call fails with "SHA of the file being replaced is
+required when updating existing files."
 
 ## Batch push multiple files
 
-```bash
-mcporter call github.push_files owner=owner repo=myrepo branch=main \
-  --args '{
-    "files": [
-      {"path": "README.md", "content": "# My Project\n..."},
-      {"path": "src/main.ts", "content": "console.log(\"hello\");"},
-      {"path": ".gitignore", "content": "node_modules/\n"}
-    ],
-    "message": "feat: initial commit"
-  }'
+```ts
+await mcp.github.push_files({
+  owner: "owner", repo: "myrepo", branch: "main",
+  files: [
+    { path: "README.md",    content: "# My Project\n..." },
+    { path: "src/main.ts",  content: 'console.log("hello");' },
+    { path: ".gitignore",   content: "node_modules/\n" },
+  ],
+  message: "feat: initial commit",
+});
 ```
 
-**Params:** `owner`, `repo`, `branch`, `files` (array of `{path, content}`),
-`message` (all required).
-
----
+**Params:** `owner`, `repo`, `branch`, `files` (`[{path, content}]`),
+`message` (all required). One commit for all files — no `sha` needed.
 
 ## Create a pull request
 
-```bash
-# Simple PR
-mcporter call github.create_pull_request \
-  owner=owner repo=myrepo \
-  title="Add user authentication" \
-  head=feature-auth \
-  base=main \
-  body="Implements login/logout with JWT tokens."
-
-# Draft PR
-mcporter call github.create_pull_request \
-  owner=owner repo=myrepo \
-  title="WIP: new dashboard" \
-  head=feature-dashboard \
-  base=main \
-  draft=true
-
-# Allow maintainer to edit
-mcporter call github.create_pull_request \
-  owner=owner repo=myrepo \
-  title="Fix typo in docs" \
-  head=fix-docs-typo \
-  base=main \
-  maintainer_can_modify=true
+```ts
+await mcp.github.create_pull_request({
+  owner: "owner", repo: "myrepo",
+  title: "Add user authentication",
+  head: "feature-auth", base: "main",
+  body: "Implements login/logout with JWT tokens.",
+  draft: true,                    // optional
+  reviewers: ["reviewer-login"],  // optional
+});
 ```
 
 **Params:** `owner`, `repo`, `title`, `head`, `base` (required); `body`,
-`draft`, `maintainer_can_modify` (optional).
-
----
+`draft`, `maintainer_can_modify`, `reviewers` (optional).
 
 ## Review a pull request
 
-```bash
-# Approve
-mcporter call github.create_pull_request_review \
-  owner=owner repo=myrepo pull_number=42 \
-  body="LGTM, ready to merge." \
-  event=APPROVE
-
-# Request changes
-mcporter call github.create_pull_request_review \
-  owner=owner repo=myrepo pull_number=42 \
-  body="Please address the security concerns noted in line 45." \
-  event=REQUEST_CHANGES
-
-# Comment without state change
-mcporter call github.create_pull_request_review \
-  owner=owner repo=myrepo pull_number=42 \
-  body="Great work on the refactoring!" \
-  event=COMMENT
+```ts
+// Approve
+await mcp.github.pull_request_review_write({
+  method: "approve",  // pick per intent: approve / request_changes / comment
+  owner: "owner", repo: "myrepo", pullNumber: 42,
+  body: "LGTM, ready to merge.",
+});
 ```
 
-**Params:** `owner`, `repo`, `pull_number`, `body`, `event` (required); `event`
-must be `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`. Optional: `commit_id`,
-`comments` (array of review comments with path/position).
-
----
+**Params:** `method`, `owner`, `repo`, `pullNumber` (required); `body`,
+`commitID`, `threadId` (optional). Check the exact `method` enum with
+`tools.describe({ ref: "mcp.github.pull_request_review_write" })` before
+first use — the server may name modes differently.
 
 ## Merge a pull request
 
-```bash
-# Default merge method (merge)
-mcporter call github.merge_pull_request \
-  owner=owner repo=myrepo pull_number=42
-
-# Squash merge (common for clean history)
-mcporter call github.merge_pull_request \
-  owner=owner repo=myrepo pull_number=42 merge_method=squash
-
-# Rebase merge
-mcporter call github.merge_pull_request \
-  owner=owner repo=myrepo pull_number=42 merge_method=rebase
-
-# With custom commit message
-mcporter call github.merge_pull_request \
-  owner=owner repo=myrepo pull_number=42 \
-  commit_title="feat: add user authentication" \
-  commit_message="Implements login/logout with JWT tokens. Fixes #123."
+```ts
+await mcp.github.merge_pull_request({
+  owner: "owner", repo: "myrepo", pullNumber: 42,
+  merge_method: "squash",   // "merge" | "squash" | "rebase"
+  commit_title: "feat: add user authentication",
+  commit_message: "Implements login/logout with JWT tokens. Fixes #123.",
+});
 ```
 
-**Params:** `owner`, `repo`, `pull_number` (required); `commit_title`,
-`commit_message`, `merge_method` (optional; `merge` \| `squash` \| `rebase`).
-
----
+**Params:** `owner`, `repo`, `pullNumber` (required); `commit_title`,
+`commit_message`, `merge_method`, `expectedHeadSha` (optional — set it to
+avoid racing a force-push).
 
 ## Fork a repository
 
-```bash
-# Fork to your personal account
-mcporter call github.fork_repository owner=earendil-works repo=pi
-
-# Fork to an organization
-mcporter call github.fork_repository owner=earendil-works repo=pi organization=myorg
+```ts
+await mcp.github.fork_repository({ owner: "earendil-works", repo: "pi" });
 ```
-
-**Params:** `owner`, `repo` (required); `organization` (optional, defaults to
-your personal account).
-
----
 
 ## Common gotchas
 
 | Gotcha | Solution |
 |---|---|
 | Updating a file fails without `sha` | Get `sha` from `get_file_contents` first (see above) |
-| PR merge fails with "not mergeable" | Check CI status with `get_pull_request_status`, resolve conflicts |
-| Branch creation fails with "branch already exists" | Use a different branch name or delete existing branch via git CLI |
-| Auth errors on write ops | Ensure `GITHUB_PERSONAL_ACCESS_TOKEN` has correct scopes (`repo`, `public_repo` for public) |
+| PR merge fails with "not mergeable" | Check CI: `pull_request_read({ method: "get_status", ... })`; resolve conflicts |
+| Branch creation fails "already exists" | Use a different name or delete via git CLI |
+| Auth errors on write ops | Token needs `repo` scope (`public_repo` for public only) |
+| Old param names rejected | `q`→`query`, `pull_number`→`pullNumber` (see `../SKILL.md` rename map) |
 
 ---
 
 ## See also
 
-- `../SKILL.md` — top tools and search/read workflows
-- `tools.md` — all 26 tools with full signatures
+- `../SKILL.md` — top tools, rename map, search/read workflows
+- `tools.md` — all 44 tools with full signatures

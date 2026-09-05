@@ -126,7 +126,7 @@ await mcp.chrome_devtools.navigate_page({ pageId: 1, type: "reload", ignoreCache
 // See — snapshot (a11y tree, primary view) or screenshot (colors/layout)
 await mcp.chrome_devtools.take_snapshot({ pageId: 1 });
 await mcp.chrome_devtools.take_snapshot({ pageId: 1, verbose: true });
-const tmp = (await pi.bash({ cmd: "echo $TMPDIR" })).output.trim();
+const tmp = "/tmp";
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
 
 // Interact (need a uid from a snapshot)
@@ -164,16 +164,17 @@ the configured workspace roots`.
 
 | Location | Works? | Notes |
 |---|---|---|
-| `"$TMPDIR"` | ✅ **default safe choice** | macOS `/var/folders/…/T/` — always allowed |
-| `/tmp` | ❌ on macOS | canonical is `/private/tmp`, outside the root |
-| project dir | ❌ by default | not a root unless configured |
-| `~/.mcporter` | ❌ by default | not a root |
+| `/tmp` | ✅ **default on this WSL box** | usual workspace root |
+| `$TMPDIR` | ✅ | fallback if `/tmp` is oddly configured |
+| project dir | ✅ | project root is a workspace root |
+| arbitrary paths | ❌ | `Access denied: path … is not within any of the configured workspace roots` |
 
-**Rule: always use `"$TMPDIR"`** (the OS temp dir). On macOS this is
-`/var/folders/…/T/` — *not* `/tmp`.
+**Rule: save under `/tmp`** (this WSL box). If a path is rejected with
+`Access denied: … not within any of the configured workspace roots`, use
+`$TMPDIR` or the project dir.
 
 ```ts
-const tmp = (await pi.bash({ cmd: "echo $TMPDIR" })).output.trim();
+const tmp = "/tmp";
 
 // Full page
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
@@ -227,7 +228,7 @@ entire scrollable page (incompatible with `uid`).
   "is text X rendered?" checks, trust the screenshot or scrollWidth metrics.
 ## When you need more
 
-- **First-run setup** (mcporter/Chrome/config/daemon missing) → `pi.read({ path: "<skill-dir>/references/setup.md" })`
+- **First-run setup** (Chrome instances / ports / config missing) → `pi.read({ path: "<skill-dir>/references/setup.md" })`
 - **Tool schemas** → `tools.describe({ ref: "mcp.chrome_devtools.<tool>" })` — live, always current. Don't read static tool lists.
 - **Cookbook workflows** (table scraping, lazy-load, login, SPA debug, perf trace) → `pi.read({ path: "<skill-dir>/references/recipes.md" })`
 
@@ -236,7 +237,7 @@ Load these only when the task needs them — that's the whole point.
 ## Anti-patterns
 
 - ❌ `take_screenshot` to read text/DOM → use `take_snapshot` (cheaper, precise)
-- ❌ `filePath=/tmp/…` on macOS → `Access denied` (canonical `/private/tmp` is outside the root). Use `"$TMPDIR"` → see Screenshots section
+- ❌ Screenshot paths outside workspace roots → `Access denied`; use `/tmp` on this box → see Screenshots section
 - ❌ Multiple `fill` calls for one form → use `fill_form` (one round-trip)
 - ❌ Guessing selectors when you have a `uid` → snapshot first, use the uid
 - ❌ **`evaluate_script` for actions** (`.click()`, `.value=`, `scrollTo`) → use `click` / `fill` / `press_key` (real events + snapshot)
@@ -245,8 +246,9 @@ Load these only when the task needs them — that's the whole point.
 
 ## Troubleshooting
 
-Most failures are cold starts or stale uids, not crashes. There is **no**
-`mcp.$reload()` in the fabric build — the recovery is **wait and retry**.
+Most failures are cold starts or stale uids, not crashes — **wait and retry**
+first. Config changed mid-session? Force a reconnect with
+`tools.call({ ref: "mcp.$reload" })` (closes and reopens every MCP connection).
 
 | Symptom | Fix |
 |---|---|

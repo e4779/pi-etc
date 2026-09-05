@@ -1,379 +1,504 @@
 # GitHub MCP — Full Tool Reference
 
-> **Read on demand.** All 26 tools across search, issues, PRs, files, and repo
-> management. The top 8 tools live in `../SKILL.md`; load this when you need
-> write operations or the full surface area.
+> **Read on demand.** All 44 tools, generated from the live fabric catalog.
+The top tools live in `../SKILL.md`; write-operation patterns in `writes.md`.
 
-**Confirm what's live on your box:**
-```bash
-mcporter list github --brief
-mcporter list github --schema   # full params
+**Confirm what's live on your box** (inside `fabric_exec`):
+```ts
+await tools.call({ ref: "mcp.$servers" });   // server list + tool counts
+await tools.list({ provider: "mcp" });       // full catalog
+const d = await tools.describe({ ref: "mcp.github.issue_write" }); // one schema
 ```
 
-All calls: `mcporter call github.<tool> key=value ...`
+All calls: `await mcp.github.<tool>({ ...args })` inside `fabric_exec`.
+Server missing? Add it to `~/.mcporter/mcporter.json`, then
+`tools.call({ ref: "mcp.$reload" })`.
 
 ---
 
-## Search (4 tools)
+## Identity
 
-### `search_repositories(query, page?, perPage?)` — find repos by query
-```bash
-mcporter call github.search_repositories query="stars:>1000 language:rust" perPage=3
-mcporter call github.search_repositories query="topic:ai language:python" page=2
-```
-| param | type | req | notes |
+
+### `get_me` — Get details of the authenticated GitHub user. Use this when a request is about the user's own profile for GitHub. Or when information is missing to build other tool calls.
+No parameters.
+
+## Search
+
+
+### `search_repositories` — Find GitHub repositories by name, description, readme, topics, or other metadata. Perfect for discovering projects, finding examples, or locating specific repositories across GitHub.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `query` | string | ✓ | GitHub search syntax (e.g. `stars:>1000 language:rust`) |
-| `page` | number | | page number (default: 1) |
-| `perPage` | number | | results per page (default: 30, max: 100) |
+| `minimal_output` | boolean |  |  |
+| `order` | string |  | asc \| desc |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `query` | string | ✓ |  |
+| `sort` | string |  | stars \| forks \| help-wanted-issues \| updated |
 
-### `search_code(q, order?, page?, per_page?)` — search code across GitHub
-```bash
-mcporter call github.search_code q="filename:package.json express in:file"
-mcporter call github.search_code q="import React from 'react'" per_page=10
-```
-| param | type | req | notes |
+### `search_code` — Fast and precise code search across ALL GitHub repositories using GitHub's native search engine. Best for finding exact symbols, functions, classes, or specific code patterns.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `q` | string | ✓ | search query |
-| `order` | string | | `asc` \| `desc` |
-| `page` | number | | page number (min: 1) |
-| `per_page` | number | | results per page (min: 1, max: 100) |
+| `fields` | array |  |  |
+| `order` | string |  | asc \| desc |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `query` | string | ✓ |  |
+| `sort` | string |  |  |
 
-### `search_issues(q, order?, page?, per_page?, sort?)` — search issues/PRs
-```bash
-mcporter call github.search_issues q="is:open label:bug repo:owner/name"
-mcporter call github.search_issues q="is:pr is:merged author:me" sort=created
-```
-| param | type | req | notes |
+### `search_issues` — Search issues using natural-language semantic matching. Best for conceptual or paraphrased queries (e.g. "login fails after password reset"). Already scoped to is:issue.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `q` | string | ✓ | search query |
-| `order` | string | | `asc` \| `desc` |
-| `page` | number | | page number (min: 1) |
-| `per_page` | number | | results per page (min: 1, max: 100) |
-| `sort` | string | | `comments` \| `reactions` \| `interactions` \| `created` \| `updated` |
+| `fields` | array |  |  |
+| `order` | string |  | asc \| desc |
+| `owner` | string |  |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `query` | string | ✓ |  |
+| `repo` | string |  |  |
+| `sort` | string |  | comments \| reactions \| reactions-+1 \| reactions--1 \| reactions-smile \| reactions-thinking_face \| reactions-heart \| reactions-tada \| interactions \| created \| updated |
 
-### `search_users(q, order?, page?, per_page?, sort?)` — find users/orgs
-```bash
-mcporter call github.search_users q="language:rust location:berlin"
-mcporter call github.search_users q="followers:>1000" sort=followers
-```
-| param | type | req | notes |
+### `search_pull_requests` — Search for pull requests in GitHub repositories using issues search syntax already scoped to is:pr
+| param | type | req | enum/values |
 |---|---|---|---|
-| `q` | string | ✓ | search query |
-| `order` | string | | `asc` \| `desc` |
-| `page` | number | | page number (min: 1) |
-| `per_page` | number | | results per page (min: 1, max: 100) |
-| `sort` | string | | `followers` \| `repositories` \| `joined` |
+| `fields` | array |  |  |
+| `order` | string |  | asc \| desc |
+| `owner` | string |  |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `query` | string | ✓ |  |
+| `repo` | string |  |  |
+| `sort` | string |  | comments \| reactions \| reactions-+1 \| reactions--1 \| reactions-smile \| reactions-thinking_face \| reactions-heart \| reactions-tada \| interactions \| created \| updated |
 
----
-
-## Issues (5 tools)
-
-### `list_issues(owner, repo, direction?, labels?, page?, per_page?, since?, sort?, state?)` — list issues
-```bash
-mcporter call github.list_issues owner=earendil-works repo=pi state=open
-mcporter call github.list_issues owner=owner repo=myrepo state=closed labels=bug,high
-```
-| param | type | req | notes |
+### `search_commits` — Search for commits across GitHub repositories using GitHub's commit search syntax. Useful for finding specific changes, authors, or messages across one or many repositories. Searches the default branch only.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `direction` | string | | `asc` \| `desc` |
-| `labels` | string[] | | filter by labels |
-| `page` | number | | page number |
-| `per_page` | number | | results per page |
-| `since` | string | | ISO 8601 timestamp |
-| `sort` | string | | `created` \| `updated` \| `comments` |
-| `state` | string | | `open` \| `closed` \| `all` |
+| `order` | string |  | asc \| desc |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `query` | string | ✓ |  |
+| `sort` | string |  | author-date \| committer-date |
 
-### `get_issue(owner, repo, issue_number)` — get a single issue
-```bash
-mcporter call github.get_issue owner=earendil-works repo=pi issue_number=123
-```
-| param | type | req | notes |
+### `search_users` — Find GitHub users by username, real name, or other profile information. Useful for locating developers, contributors, or team members.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `issue_number` | number | ✓ | issue number |
+| `order` | string |  | asc \| desc |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `query` | string | ✓ |  |
+| `sort` | string |  | followers \| repositories \| joined |
 
-### `create_issue(owner, repo, title, body?, assignees?, labels?, milestone?)` — file an issue
-```bash
-mcporter call github.create_issue owner=owner repo=myrepo title="Bug: ..." \
-  body="Detailed description..." assignees='["username"]' labels='["bug","high"]'
-```
-| param | type | req | notes |
+## Issues — read
+
+
+### `list_issues` — List issues in a GitHub repository. For pagination, use the 'endCursor' from the previous response's 'pageInfo' in the 'after' parameter.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `title` | string | ✓ | issue title |
-| `body` | string | | issue body/description |
-| `assignees` | string[] | | array of usernames |
-| `labels` | string[] | | array of label names |
-| `milestone` | number | | milestone number |
+| `after` | string |  |  |
+| `direction` | string |  | ASC \| DESC |
+| `field_filters` | array |  |  |
+| `fields` | array |  |  |
+| `labels` | array |  |  |
+| `orderBy` | string |  | CREATED_AT \| UPDATED_AT \| COMMENTS |
+| `owner` | string | ✓ |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+| `since` | string |  |  |
+| `state` | string |  | OPEN \| CLOSED |
 
-### `update_issue(owner, repo, issue_number, title?, body?, state?, assignees?, labels?, milestone?)` — update an issue
-```bash
-mcporter call github.update_issue owner=owner repo=myrepo issue_number=123 state=closed
-mcporter call github.update_issue owner=owner repo=myrepo issue_number=123 title="New title"
-```
-| param | type | req | notes |
+### `issue_read` — Get information about a specific issue in a GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `issue_number` | number | ✓ | issue number |
-| `title` | string | | new title |
-| `body` | string | | new body |
-| `state` | string | | `open` \| `closed` |
-| `assignees` | string[] | | array of usernames |
-| `labels` | string[] | | array of label names |
-| `milestone` | number | | milestone number |
+| `issue_number` | number | ✓ |  |
+| `method` | string | ✓ | get \| get_comments \| get_sub_issues \| get_parent \| get_labels |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
 
-### `add_issue_comment(owner, repo, issue_number, body)` — comment on an issue
-```bash
-mcporter call github.add_issue_comment owner=owner repo=myrepo issue_number=123 \
-  body="This is a comment."
-```
-| param | type | req | notes |
+### `list_issue_fields` — List issue fields for a repository or organization. Returns field definitions including name, type (text, number, date, single_select), and for single_select fields the list of valid option names. When repo is omitted, returns org-level fields directly.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `issue_number` | number | ✓ | issue number |
-| `body` | string | ✓ | comment text |
+| `owner` | string | ✓ |  |
+| `repo` | string |  |  |
 
----
-
-## Pull requests (8 tools)
-
-### `list_pull_requests(owner, repo, state?, head?, base?, sort?, direction?, per_page?, page?)` — list PRs
-```bash
-mcporter call github.list_pull_requests owner=earendil-works repo=pi state=open
-mcporter call github.list_pull_requests owner=owner repo=myrepo head=feature-branch
-```
-| param | type | req | notes |
+### `list_issue_types` — List supported issue types for a repository or its owner organization. When repo is omitted, returns org-level issue types directly.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `state` | string | | `open` \| `closed` \| `all` |
-| `head` | string | | filter by head branch |
-| `base` | string | | filter by base branch |
-| `sort` | string | | `created` \| `updated` \| `popularity` \| `long-running` |
-| `direction` | string | | `asc` \| `desc` |
-| `per_page` | number | | results per page |
-| `page` | number | | page number |
+| `owner` | string | ✓ |  |
+| `repo` | string |  |  |
 
-### `get_pull_request(owner, repo, pull_number)` — get a PR
-```bash
-mcporter call github.get_pull_request owner=earendil-works repo=pi pull_number=42
-```
-| param | type | req | notes |
+### `get_label` — Get a specific label from a repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
+| `name` | string | ✓ |  |
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
 
-### `get_pull_request_files(owner, repo, pull_number)` — get PR diff
-```bash
-mcporter call github.get_pull_request_files owner=earendil-works repo=pi pull_number=42
-```
-| param | type | req | notes |
+## Issues — write
+
+
+### `issue_write` — Create a new or update an existing issue in a GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
+| `assignees` | array |  |  |
+| `body` | string |  |  |
+| `duplicate_of` | number |  |  |
+| `issue_fields` | array |  |  |
+| `issue_number` | number |  |  |
+| `labels` | array |  |  |
+| `method` | string | ✓ | create \| update |
+| `milestone` | number |  |  |
+| `owner` | string | ✓ |  |
+| `parent_issue_number` | number |  |  |
+| `parent_owner` | string |  |  |
+| `parent_repo` | string |  |  |
+| `repo` | string | ✓ |  |
+| `state` | string |  | open \| closed |
+| `state_reason` | string |  | completed \| not_planned \| duplicate |
+| `title` | string |  |  |
+| `type` | ? |  |  |
 
-### `get_pull_request_status(owner, repo, pull_number)` — get PR CI status
-```bash
-mcporter call github.get_pull_request_status owner=earendil-works repo=pi pull_number=42
-```
-| param | type | req | notes |
+### `sub_issue_write` — Add a sub-issue to a parent issue in a GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
+| `after_id` | number |  |  |
+| `before_id` | number |  |  |
+| `issue_number` | number | ✓ |  |
+| `method` | string | ✓ |  |
+| `owner` | string | ✓ |  |
+| `replace_parent` | boolean |  |  |
+| `repo` | string | ✓ |  |
+| `sub_issue_id` | number | ✓ |  |
 
-### `get_pull_request_comments(owner, repo, pull_number)` — get PR review comments
-```bash
-mcporter call github.get_pull_request_comments owner=earendil-works repo=pi pull_number=42
-```
-| param | type | req | notes |
+### `add_issue_comment` — Add a comment and/or reaction to a specific issue or issue comment in a GitHub repository. Use this tool with pull requests as well (in this case pass pull request number as issue_number), but only if user is not asking specifically to add or react to review comments. At least one of body or reaction is required.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
+| `body` | string |  |  |
+| `comment_id` | integer |  |  |
+| `issue_number` | number | ✓ |  |
+| `owner` | string | ✓ |  |
+| `reaction` | string |  | +1 \| -1 \| laugh \| confused \| heart \| hooray \| rocket \| eyes |
+| `repo` | string | ✓ |  |
 
-### `get_pull_request_reviews(owner, repo, pull_number)` — get PR reviews
-```bash
-mcporter call github.get_pull_request_reviews owner=earendil-works repo=pi pull_number=42
-```
-| param | type | req | notes |
+## Pull requests — read
+
+
+### `list_pull_requests` — List pull requests in a GitHub repository. If the user specifies an author, then DO NOT use this tool and use the search_pull_requests tool instead.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
+| `base` | string |  |  |
+| `direction` | string |  | asc \| desc |
+| `fields` | array |  |  |
+| `head` | string |  |  |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+| `sort` | string |  | created \| updated \| popularity \| long-running |
+| `state` | string |  | open \| closed \| all |
 
-### `create_pull_request(owner, repo, title, head, base, body?, draft?, maintainer_can_modify?)` — create a PR
-```bash
-mcporter call github.create_pull_request owner=owner repo=myrepo \
-  title="Add feature X" head=feature-branch base=main body="Description..."
-mcporter call github.create_pull_request owner=owner repo=myrepo \
-  title="WIP: feature" head=wip-branch base=main draft=true
-```
-| param | type | req | notes |
+### `pull_request_read` — Get information on a specific pull request in GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `title` | string | ✓ | PR title |
-| `head` | string | ✓ | head branch (your changes) |
-| `base` | string | ✓ | base branch (target) |
-| `body` | string | | PR body/description |
-| `draft` | boolean | | create as draft |
-| `maintainer_can_modify` | boolean | | allow maintainer edits |
+| `after` | string |  |  |
+| `method` | string | ✓ | get \| get_diff \| get_status \| get_files \| get_commits \| get_review_comments \| get_reviews \| get_comments \| get_check_runs |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
 
-### `create_pull_request_review(owner, repo, pull_number, body, event, commit_id?, comments?)` — review a PR
-```bash
-mcporter call github.create_pull_request_review owner=owner repo=myrepo pull_number=42 \
-  body="LGTM" event=APPROVE
-mcporter call github.create_pull_request_review owner=owner repo=myrepo pull_number=42 \
-  body="Needs work" event=REQUEST_CHANGES
-```
-| param | type | req | notes |
+## Pull requests — write
+
+
+### `create_pull_request` — Create a new pull request in a GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
-| `body` | string | ✓ | review text |
-| `event` | string | ✓ | `APPROVE` \| `REQUEST_CHANGES` \| `COMMENT` |
-| `commit_id` | string | | specific commit SHA |
-| `comments` | array | | review comments with path/position |
+| `base` | string | ✓ |  |
+| `body` | string |  |  |
+| `draft` | boolean |  |  |
+| `head` | string | ✓ |  |
+| `maintainer_can_modify` | boolean |  |  |
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+| `reviewers` | array |  |  |
+| `title` | string | ✓ |  |
 
-### `merge_pull_request(owner, repo, pull_number, commit_title?, commit_message?, merge_method?)` — merge a PR
-```bash
-mcporter call github.merge_pull_request owner=owner repo=myrepo pull_number=42
-mcporter call github.merge_pull_request owner=owner repo=myrepo pull_number=42 merge_method=squash
-```
-| param | type | req | notes |
+### `update_pull_request` — Update an existing pull request in a GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
-| `commit_title` | string | | commit title |
-| `commit_message` | string | | commit message detail |
-| `merge_method` | string | | `merge` \| `squash` \| `rebase` |
+| `base` | string |  |  |
+| `body` | string |  |  |
+| `draft` | boolean |  |  |
+| `maintainer_can_modify` | boolean |  |  |
+| `owner` | string | ✓ |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
+| `reviewers` | array |  |  |
+| `state` | string |  | open \| closed |
+| `title` | string |  |  |
 
-### `update_pull_request_branch(owner, repo, pull_number, expected_head_sha?)` — update PR branch
-```bash
-mcporter call github.update_pull_request_branch owner=owner repo=myrepo pull_number=42
-```
-| param | type | req | notes |
+### `update_pull_request_branch` — Update the branch of a pull request with the latest changes from the base branch.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `pull_number` | number | ✓ | PR number |
-| `expected_head_sha` | string | | expected HEAD SHA |
+| `expectedHeadSha` | string |  |  |
+| `owner` | string | ✓ |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
 
----
-
-## Files (4 tools)
-
-### `get_file_contents(owner, repo, path, branch?)` — read a file
-```bash
-mcporter call github.get_file_contents owner=earendil-works repo=pi path=README.md
-mcporter call github.get_file_contents owner=earendil-works repo=pi path=src/main.rs branch=dev
-```
-| param | type | req | notes |
+### `merge_pull_request` — Merge a pull request in a GitHub repository.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `path` | string | ✓ | file path |
-| `branch` | string | | branch name (default: repo default) |
+| `commit_message` | string |  |  |
+| `commit_title` | string |  |  |
+| `expectedHeadSha` | string |  |  |
+| `merge_method` | string |  | merge \| squash \| rebase |
+| `owner` | string | ✓ |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
 
-### `create_or_update_file(owner, repo, path, content, message, branch, sha?)` — create/update a file
-```bash
-# Create (sha not needed)
-mcporter call github.create_or_update_file owner=owner repo=myrepo path=README.md \
-  content="Hello" message="Initial commit" branch=main
+### `pull_request_review_write` — Create and/or submit, delete review of a pull request.
 
-# Update (sha REQUIRED)
-mcporter call github.create_or_update_file owner=owner repo=myrepo path=README.md \
-  content="Hello world" message="Update README" branch=main sha=abc123...
-```
-| param | type | req | notes |
+Available methods:
+- create: Create a new review of a pull request. If "event" parameter is provided, the review is submitted. If "event" is omitted, a pending review is created.
+- submit_pending: Submit an existing pending review of a pull request. This requires that a pending review exists for the current user on the specified pull request. The "body" and "event" parameters are used when submitting the review.
+- delete_pending: Delete an existing pending review of a pull request. This requires that a pending review exists for the current user on the specified pull request.
+- resolve_thread: Resolve a review thread. Requires only "threadId" parameter with the thread's node ID (e.g., PRRT_kwDOxxx). The owner, repo, and pullNumber parameters are not used for this method. Resolving an already-resolved thread is a no-op.
+- unresolve_thread: Unresolve a previously resolved review thread. Requires only "threadId" parameter. The owner, repo, and pullNumber parameters are not used for this method. Unresolving an already-unresolved thread is a no-op.
+
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `path` | string | ✓ | file path |
-| `content` | string | ✓ | file content |
-| `message` | string | ✓ | commit message |
-| `branch` | string | ✓ | branch name |
-| `sha` | string | | **required when updating** (get from `get_file_contents`) |
+| `body` | string |  |  |
+| `commitID` | string |  |  |
+| `event` | string |  | APPROVE \| REQUEST_CHANGES \| COMMENT |
+| `method` | string | ✓ | create \| submit_pending \| delete_pending \| resolve_thread \| unresolve_thread |
+| `owner` | string | ✓ |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
+| `threadId` | string |  |  |
 
-### `push_files(owner, repo, branch, files, message)` — batch push files
-```bash
-mcporter call github.push_files owner=owner repo=myrepo branch=main \
-  --args '{"files":[{"path":"README.md","content":"Hello"},{"path":"src/main.rs","content":"fn main() {}"}],"message":"Initial commit"}'
-```
-| param | type | req | notes |
+### `add_comment_to_pending_review` — Add review comment to the requester's latest pending pull request review. A pending review needs to already exist to call this (check with the user if not sure).
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `branch` | string | ✓ | branch name |
-| `files` | array | ✓ | `[{path, content}, ...]` |
-| `message` | string | ✓ | commit message |
+| `body` | string | ✓ |  |
+| `line` | number |  |  |
+| `owner` | string | ✓ |  |
+| `path` | string | ✓ |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
+| `side` | string |  | LEFT \| RIGHT |
+| `startLine` | number |  |  |
+| `startSide` | string |  | LEFT \| RIGHT |
+| `subjectType` | string | ✓ | FILE \| LINE |
 
-### `create_branch(owner, repo, branch, from_branch?)` — create a branch
-```bash
-mcporter call github.create_branch owner=owner repo=myrepo branch=feature-xyz
-mcporter call github.create_branch owner=owner repo=myrepo branch=feature-xyz from_branch=dev
-```
-| param | type | req | notes |
+### `add_reply_to_pull_request_comment` — Add a reply and/or reaction to an existing pull request comment. This can create a new comment linked as a reply to the specified comment, add an emoji reaction to the specified comment, or do both. At least one of body or reaction is required.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `branch` | string | ✓ | new branch name |
-| `from_branch` | string | | source branch (default: repo default) |
+| `body` | string |  |  |
+| `commentId` | number | ✓ |  |
+| `owner` | string | ✓ |  |
+| `pullNumber` | number |  |  |
+| `reaction` | string |  | +1 \| -1 \| laugh \| confused \| heart \| hooray \| rocket \| eyes |
+| `repo` | string | ✓ |  |
 
-### `list_commits(owner, repo, sha?, page?, perPage?)` — list commits
-```bash
-mcporter call github.list_commits owner=earendil-works repo=pi
-mcporter call github.list_commits owner=earendil-works repo=pi sha=main perPage=10
-```
-| param | type | req | notes |
+### `request_copilot_review` — Request a GitHub Copilot code review for a pull request. Use this for automated feedback on pull requests, usually before requesting a human reviewer.
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `sha` | string | | branch/commit SHA |
-| `page` | number | | page number |
-| `perPage` | number | | results per page |
+| `owner` | string | ✓ |  |
+| `pullNumber` | number | ✓ |  |
+| `repo` | string | ✓ |  |
 
----
+### `assign_copilot_to_issue` — Assign Copilot to a specific issue in a GitHub repository.
 
-## Repo management (3 tools)
+This tool can help with the following outcomes:
+- a Pull Request created with source code changes to resolve the issue
 
-### `create_repository(name, description?, private?, autoInit?)` — create a repo
-```bash
-mcporter call github.create_repository name=myrepo description="My repo" private=false autoInit=true
-```
-| param | type | req | notes |
+
+More information can be found at:
+- https://docs.github.com/en/copilot/concepts/agents/cloud-agent/about-cloud-agent
+
+| param | type | req | enum/values |
 |---|---|---|---|
-| `name` | string | ✓ | repository name |
-| `description` | string | | repository description |
-| `private` | boolean | | private repo |
-| `autoInit` | boolean | | initialize with README.md |
+| `base_ref` | string |  |  |
+| `custom_instructions` | string |  |  |
+| `issue_number` | number | ✓ |  |
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
 
-### `fork_repository(owner, repo, organization?)` — fork a repo
-```bash
-mcporter call github.fork_repository owner=earendil-works repo=pi
-mcporter call github.fork_repository owner=earendil-works repo=pi organization=myorg
-```
-| param | type | req | notes |
+## Files
+
+
+### `get_file_contents` — Get the contents of a file or directory from a GitHub repository
+| param | type | req | enum/values |
 |---|---|---|---|
-| `owner` | string | ✓ | repository owner |
-| `repo` | string | ✓ | repository name |
-| `organization` | string | | fork to organization |
+| `fields` | array |  |  |
+| `owner` | string | ✓ |  |
+| `path` | string |  |  |
+| `ref` | string |  |  |
+| `repo` | string | ✓ |  |
+| `sha` | string |  |  |
+
+### `create_or_update_file` — Create or update a single file in a GitHub repository. 
+If updating, you should provide the SHA of the file you want to update. Use this tool to create or update a file in a GitHub repository remotely; do not use it for local file operations.
+
+To obtain the current blob SHA before updating, call the get_file_contents tool with the same owner, repo, and path, and set its ref parameter to this tool's branch value. The first text result reports the blob SHA for the requested path.
+
+SHA MUST be provided for existing file updates.
+
+| param | type | req | enum/values |
+|---|---|---|---|
+| `allow_symlink_write` | boolean |  |  |
+| `branch` | string | ✓ |  |
+| `content` | string | ✓ |  |
+| `message` | string | ✓ |  |
+| `owner` | string | ✓ |  |
+| `path` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+| `sha` | string |  |  |
+
+### `push_files` — Push multiple files to a GitHub repository in a single commit
+| param | type | req | enum/values |
+|---|---|---|---|
+| `branch` | string | ✓ |  |
+| `files` | array | ✓ |  |
+| `message` | string | ✓ |  |
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+
+### `delete_file` — Delete a file from a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `branch` | string | ✓ |  |
+| `message` | string | ✓ |  |
+| `owner` | string | ✓ |  |
+| `path` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+
+## Commits & refs
+
+
+### `get_commit` — Get details for a commit from a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `detail` | string |  | none \| stats \| full_patch |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+| `sha` | string | ✓ |  |
+
+### `list_commits` — Get list of commits of a branch in a GitHub repository. Returns at least 30 results per page by default, but can return more if specified using the perPage parameter (up to 100).
+| param | type | req | enum/values |
+|---|---|---|---|
+| `author` | string |  |  |
+| `fields` | array |  |  |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `path` | string |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+| `sha` | string |  |  |
+| `since` | string |  |  |
+| `until` | string |  |  |
+
+### `create_branch` — Create a new branch in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `branch` | string | ✓ |  |
+| `from_branch` | string |  |  |
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+
+### `list_branches` — List branches in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+
+### `get_tag` — Get details about a specific git tag in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+| `tag` | string | ✓ |  |
+
+### `list_tags` — List git tags in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+
+## Releases
+
+
+### `get_latest_release` — Get the latest release in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+
+### `get_release_by_tag` — Get a specific release by its tag name in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+| `tag` | string | ✓ |  |
+
+### `list_releases` — List releases in a GitHub repository
+| param | type | req | enum/values |
+|---|---|---|---|
+| `fields` | array |  |  |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
+
+## Repository
+
+
+### `create_repository` — Create a new GitHub repository in your account or specified organization
+| param | type | req | enum/values |
+|---|---|---|---|
+| `autoInit` | boolean |  |  |
+| `description` | string |  |  |
+| `name` | string | ✓ |  |
+| `organization` | string |  |  |
+| `private` | boolean |  |  |
+
+### `fork_repository` — Fork a GitHub repository to your account or specified organization
+| param | type | req | enum/values |
+|---|---|---|---|
+| `organization` | string |  |  |
+| `owner` | string | ✓ |  |
+| `repo` | string | ✓ |  |
+
+### `get_teams` — Get details of the teams the user is a member of. Limited to organizations accessible with current credentials
+| param | type | req | enum/values |
+|---|---|---|---|
+| `user` | string |  |  |
+
+### `get_team_members` — Get member usernames of a specific team in an organization. Limited to organizations accessible with current credentials
+| param | type | req | enum/values |
+|---|---|---|---|
+| `org` | string | ✓ |  |
+| `team_slug` | string | ✓ |  |
+
+### `list_repository_collaborators` — List collaborators of a GitHub repository. Results are paginated; the response includes `nextPage`, `prevPage`, `firstPage`, and `lastPage` fields. To get the next page, use the `nextPage` value as the `page` parameter.
+| param | type | req | enum/values |
+|---|---|---|---|
+| `affiliation` | string |  | outside \| direct \| all |
+| `owner` | string | ✓ |  |
+| `page` | number |  |  |
+| `perPage` | number |  |  |
+| `repo` | string | ✓ |  |
 
 ---
 
 ## See also
 
-- `../SKILL.md` — the top 8 tools and common workflows
-- `writes.md` — write operation patterns (issues, PRs, files, branches, reviews)
+- `../SKILL.md` — top tools, rename map, recipes
+- `writes.md` — write-operation patterns (sha gotcha, batch push, reviews)
