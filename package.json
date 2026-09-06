@@ -8,6 +8,9 @@
     "pi-skill"
   ],
   "type": "module",
+  "scripts": {
+    "lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done"
+  },
   "pi": {
     "extensions": [
       "./extensions/qwen/index.ts",
