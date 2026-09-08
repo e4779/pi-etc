@@ -42,6 +42,7 @@ pi install ~/dev/pi-etc -l
 | Инструмент | Назначение |
 |---|---|
 | `tools/pi-session.ts` | CLI для инспекции сессий: `npx tsx tools/pi-session.ts --summary` |
+| `tools/install-hooks.mjs` | Ставит pre-commit хук (гейт `lint:skills`); запускается сам через `postinstall` при `npm install` |
 
 
 ## Селективное включение
@@ -145,6 +146,9 @@ npm install
 
 # Проверить типы
 npx tsc --noEmit
+
+# Проверить скиллы (frontmatter SKILL.md по спеке Agent Skills)
+npm run lint:skills
 
 # Тестировать локально (без установки)
 pi -e ~/dev/pi-etc/extensions/qwen/index.ts

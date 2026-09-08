@@ -9,7 +9,8 @@
   ],
   "type": "module",
   "scripts": {
-    "lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done"
+    "lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done",
+    "postinstall": "node tools/install-hooks.mjs"
   },
   "pi": {
     "extensions": [
