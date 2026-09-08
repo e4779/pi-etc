@@ -60,6 +60,19 @@ await pi.write({ path: "/tmp/source-1.md",
 Results are commonly `{ text, content, structuredContent }` — prefer
 `.structuredContent` when present, else `.text`.
 
+⚠️ `zai_search` envelope quirk (seen 2026-09-08): `structuredContent` arrives
+`null` and `text` is a **double-encoded JSON string** (JSON string wrapping a
+JSON array). Decode recursively until you hold a real array:
+
+```ts
+let v: any = r.text;
+while (typeof v === 'string') { try { v = JSON.parse(v); } catch { break; } }
+// v → [{title, link, content, refer}, ...]
+```
+
+A silent `[]` (or a string where you expect an array) is almost always this,
+not a broken search — the call itself answers in ~2s.
+
 Computed/dynamic refs and raw server names go through the generic path:
 
 ```ts
@@ -151,6 +164,7 @@ Load these only when the task needs them — that's the whole point.
 | `stale: true` in `$servers` | lazy connection — just call a tool; it wakes up |
 | `401` / auth error | `Z_AI_API_KEY` (vision env) or `Authorization` header (http servers) wrong in `~/.mcporter/mcporter.json` |
 | `429` / quota | rate/quota limit — wait and retry, or lower `content_size` |
+| search returns `[]` / string | not broken: `text` is double-encoded JSON — parse it twice (see quirk above) |
 | `Tool X not found` | name is wrong → `tools.list({provider:"mcp"})` (see the anti-pattern table above) |
 | `repo not found` on zread | `repo_name` is not a github.com `owner/repo` — other forges are not indexed |
 | Empty / truncated reader output | retry with `no_cache: true`, or raise `timeout`; some sites block bots |
