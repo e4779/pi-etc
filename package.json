@@ -15,7 +15,8 @@
   "pi": {
     "extensions": [
       "./extensions/qwen/index.ts",
-      "./extensions/lint-check/index.ts"
+      "./extensions/lint-check/index.ts",
+      "./extensions/box/index.ts"
     ],
     "skills": [
       "./skills"
