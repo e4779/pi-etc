@@ -25,6 +25,10 @@ doubt.
 
 ## drawio MCP (via mcporter: mcp.drawio.*)
 
+Discover refs with `tools.search("drawio")` — `tools.list` pages at 100 and
+servers sorted past the cap look missing (a whole session once "lost" drawio
+this way).
+
 - list_pages {path} -> ids/names/sizes.
 - get_page {path, page: "<page NAME>"} -> page mxGraphModel text. page is
   the NAME string, not an index.
@@ -48,3 +52,10 @@ doubt.
 Export at -s 2 -> multimodal critique of the PNG (overlaps, truncation,
 edges through nodes, balance) -> fix coordinates -> re-export. Judge by IHDR
 dimensions + vision, never byte size.
+
+No drawio CLI on this machine (native Linux; the `drawio -x` and
+PowerShell-version notes above are Windows/WSL history). There: validate the
+XML with ElementTree, round-trip through the drawio MCP (set_page then
+get_page — drawio re-serializes and stays the authority), and screenshot +
+vision-check if a browser path exists. `pi.bash` raises on nonzero exit —
+pass `settle=True` for probing commands (a failed glob is not a crash).
