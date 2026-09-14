@@ -16,7 +16,8 @@
     "extensions": [
       "./extensions/qwen/index.ts",
       "./extensions/lint-check/index.ts",
-      "./extensions/box/index.ts"
+      "./extensions/box/index.ts",
+      "./extensions/whoami/index.ts"
     ],
     "skills": [
       "./skills"
