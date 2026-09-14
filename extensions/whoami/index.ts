@@ -121,8 +121,8 @@ export default function (pi: ExtensionAPI) {
     const provider = (model as { provider?: string }).provider ?? "";
     const displayName = (model as { name?: string }).name ?? undefined;
 
-    (event as { systemPrompt: string }).systemPrompt =
-      systemPrompt + "\n\n" + buildIdentitySection(modelId, displayName, provider);
-    return;
+    return {
+      systemPrompt: systemPrompt + "\n\n" + buildIdentitySection(modelId, displayName, provider),
+    };
   });
 }
