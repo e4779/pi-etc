@@ -1,0 +1,10 @@
+[
+  {
+    "path": "~/.pi/agent/npm/node_modules/pi-fabric/skillsets/typescript/fabric-workflow/SKILL.md",
+    "note": "fabric dynamic workflow: agent()/parallel()/pipeline loop"
+  },
+  {
+    "path": "~/.pi/agent/git/gitverse.ru/e4779/pi-etc/skills/bun-runtime/SKILL.md",
+    "note": "bun-process guest: Bun APIs vs pi.bash decision ladder"
+  }
+]
