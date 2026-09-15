@@ -12,14 +12,18 @@ import type { ExtensionAPI, ExtensionContext, ExtensionEvent } from "@earendil-w
  * surveying narumiruna/pi-extensions, ogulcancelik/pi-extensions,
  * nicobailon/* and npm). This extension fills that gap.
  *
- * Appends (never replaces) a compact "Model Identity" section at
- * before_agent_start — the sanctioned append point per pi docs. Idempotent:
- * skips if the marker is already present (retry/compaction re-runs).
+ * Appends a compact "Model Identity" section at before_agent_start — the
+ * sanctioned append point per pi docs. Idempotent per-model: skips if the
+ * current model's section is already present (retry/compaction); replaces a
+ * stale section when the model changes mid-session via /model.
  */
 
 type BeforeAgentStartEvent = Extract<ExtensionEvent, { type: "before_agent_start" }>;
 
 const MARKER = "## Model Identity";
+/** Last line of every identity section — used to find the section boundary for replacement. */
+const SECTION_END =
+  "- When asked which model or product you are, answer from this section. Never claim to be a different model, company, or product.";
 
 interface ModelProfile {
   /** Human-readable name shown to the model. */
@@ -162,12 +166,26 @@ function buildIdentitySection(modelId: string, displayName: string | undefined, 
   return lines.join("\n");
 }
 
+/**
+ * Replace an existing Model Identity section with a new one, preserving
+ * any content appended after it (e.g. Fabric's session guidance).
+ * The section runs from MARKER to SECTION_END (both inclusive).
+ */
+function replaceIdentitySection(systemPrompt: string, newSection: string): string {
+  const startIdx = systemPrompt.indexOf(MARKER);
+  if (startIdx === -1) return systemPrompt + "\n\n" + newSection;
+
+  const endIdx = systemPrompt.indexOf(SECTION_END, startIdx);
+  if (endIdx === -1) return systemPrompt + "\n\n" + newSection; // malformed — just append
+
+  const fullEnd = endIdx + SECTION_END.length;
+  return systemPrompt.slice(0, startIdx) + newSection + systemPrompt.slice(fullEnd);
+}
+
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
     const systemPrompt = (event as { systemPrompt?: string }).systemPrompt;
     if (typeof systemPrompt !== "string") return;
-    if (systemPrompt.includes(MARKER)) return; // idempotent across retries/compaction
-
     const model = ctx.model ?? (event as { model?: { id?: string; provider?: string; name?: string } }).model;
     const modelId = model?.id ?? "";
     if (!modelId) return;
@@ -175,8 +193,17 @@ export default function (pi: ExtensionAPI) {
     const provider = (model as { provider?: string }).provider ?? "";
     const displayName = (model as { name?: string }).name ?? undefined;
 
-    return {
-      systemPrompt: systemPrompt + "\n\n" + buildIdentitySection(modelId, displayName, provider),
-    };
+    const newSection = buildIdentitySection(modelId, displayName, provider);
+
+    // True idempotency: same model, retry/compaction re-run → section already correct.
+    if (systemPrompt.includes(newSection)) return;
+
+    // Model switched mid-session (via /model): stale section present → replace it.
+    if (systemPrompt.includes(MARKER)) {
+      return { systemPrompt: replaceIdentitySection(systemPrompt, newSection) };
+    }
+
+    // First run: append.
+    return { systemPrompt: systemPrompt + "\n\n" + newSection };
   });
 }

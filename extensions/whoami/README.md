@@ -9,7 +9,7 @@ ogulcancelik/pi-extensions, nicobailon/*, npm `pi-*`), hence this one.
 
 ## What it does
 
-On `before_agent_start` it **appends** (never replaces) a compact section:
+On `before_agent_start` it injects a compact section:
 
 ```
 ## Model Identity
@@ -18,10 +18,10 @@ On `before_agent_start` it **appends** (never replaces) a compact section:
 - When asked which model or product you are, answer from this section. ...
 ```
 
-- Idempotent (marker check) — safe across retries and compaction re-runs.
+- Idempotent per-model: skips if the current model's section is already present (retry/compaction).
+- **Model-switch aware:** when the model changes mid-session via `/model`, the stale section is replaced with the new model's identity — not skipped. Without this, switching from GLM to Qwen would leave Qwen believing it is GLM.
 - Curated strengths for the models we run; unknown models get identity-only.
 - Zero configuration. Extend `PROFILES` in `index.ts` when adding models.
-
 ## Adding a model profile — behavioral strengths, not technical specs
 
 When adding a model to `PROFILES`, write **behavioral** strengths, not
