@@ -37,7 +37,6 @@ const PROFILES: Array<{ match: RegExp; profile: ModelProfile }> = [
       strengths: [
         "fast, token-efficient workhorse: everyday coding, large codebases, high-volume agent loops",
         "natively multimodal (text + image): UI screenshots, visual verification",
-        "1M-token context",
       ],
     },
   },
@@ -47,7 +46,16 @@ const PROFILES: Array<{ match: RegExp; profile: ModelProfile }> = [
       name: "GLM-5.3",
       strengths: [
         "flagship coding and long-horizon reasoning: hardest tasks, multi-step agent work, security research",
-        "1M-token context",
+      ],
+    },
+  },
+  {
+    match: /glm-5\.2/i,
+    profile: {
+      name: "GLM-5.2",
+      strengths: [
+        "Preserved Thinking (unique to GLM): reasoning_content carries across turns — reasoning continuity no other open model has; agentic by default",
+        "prompt style: high-level goals, NOT step-by-step micromanagement — give objective + context, let it plan",
       ],
     },
   },
@@ -55,7 +63,7 @@ const PROFILES: Array<{ match: RegExp; profile: ModelProfile }> = [
     match: /glm-4\.6v-flash/i,
     profile: {
       name: "GLM-4.6V-Flash (free tier)",
-      strengths: ["free vision model: image understanding, screenshot triage", "128K context, 16K output"],
+      strengths: ["free vision model: image understanding, screenshot triage"],
     },
   },
   {
@@ -70,10 +78,45 @@ const PROFILES: Array<{ match: RegExp; profile: ModelProfile }> = [
     profile: { name: "GLM (previous generation)", strengths: ["capable general coding model; server-side auto-routing sends 5.1/4.7 traffic to glm-5.3/flash"] },
   },
   {
+    match: /gigachat.*max/i,
+    profile: {
+      name: "GigaChat Max",
+      strengths: ["Sber's powerful model for complex, large-scale tasks", "strong Russian-language and RU-domain handling", "no native reasoning — keep reasoning external/incremental"],
+    },
+  },
+  {
+    match: /gigachat.*pro/i,
+    profile: {
+      name: "GigaChat Pro",
+      strengths: ["Sber's improved model, balanced quality and speed", "strong Russian-language handling", "no native reasoning — keep reasoning external/incremental"],
+    },
+  },
+  {
+    match: /gigachat-plus/i,
+    profile: {
+      name: "GigaChat Plus",
+      strengths: ["Sber model with extended context", "strong Russian-language handling", "no native reasoning — keep reasoning external/incremental"],
+    },
+  },
+  {
     match: /GigaChat3\.5-432B/i,
     profile: {
       name: "GigaChat 3.5 432B (Cloud.ru)",
       strengths: ["strong Russian-language and RU-domain handling", "fast interactive responses", "no native reasoning traces — keep reasoning external/incremental"],
+    },
+  },
+  {
+    match: /gigachat/i,
+    profile: {
+      name: "GigaChat",
+      strengths: ["Sber's fast, lightweight model for routine tasks", "strong Russian-language handling", "no native reasoning — keep reasoning external/incremental"],
+    },
+  },
+  {
+    match: /deepseek-v4-flash/i,
+    profile: {
+      name: "DeepSeek V4 Flash",
+      strengths: ["low-latency, fast responses for coding and long-context tasks", "strong reasoning; brief instructions work, structure optional"],
     },
   },
   {
@@ -84,10 +127,21 @@ const PROFILES: Array<{ match: RegExp; profile: ModelProfile }> = [
     },
   },
   {
+    match: /r1-distill/i,
+    profile: {
+      name: "DeepSeek R1-Distill (quantized)",
+      strengths: ["distilled reasoning model: good step-by-step deduction", "quantized — lower memory, slight quality trade-off", "text only"],
+    },
+  },
+  {
     match: /qwen/i,
     profile: {
-      name: "Qwen",
-      strengths: ["capable but prompt-sensitive: needs maximally explicit structured prompts with examples"],
+      name: "Qwen 3.8 27B",
+      strengths: [
+        "PROMPT-SENSITIVE (more than GLM/DeepSeek): use the 6-element framework (Context, Objective, Style, Tone, Audience, Response); be maximally explicit — Qwen infers less from context",
+        "Prompt Chaining > CoT for complex tasks: split into sequential messages, not single-shot; few-shot examples mandatory; separators (###, ===) help parse sections",
+        "limit tool list to 2-3 — Qwen worse at tool selection from large lists; tends verbose — add explicit length constraints; one main task per turn to avoid reasoning drift",
+      ],
     },
   },
 ];
