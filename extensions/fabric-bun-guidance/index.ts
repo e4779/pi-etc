@@ -29,6 +29,7 @@ const definition = {
 		"Replaces the default fabric.execution guidance slot with Bun-first examples for bun-process guests.",
 	guarantee: "revertible",
 	activate(context: unknown) {
+			dbg3("called");
 		const c = context as {
 			guide(g: {
 				label: string;
@@ -40,7 +41,7 @@ const definition = {
 		};
 		return c.guide({
 			label: "bun-first-execution-guidance",
-			models: ["*"],
+			models: ["*/*"],
 			placement: "replace",
 			slot: "fabric.execution",
 			content: CONTENT,
@@ -49,9 +50,11 @@ const definition = {
 };
 
 export default function (pi: ExtensionAPI): void {
-	const bus = (pi as unknown as { events: { emit(n: string, p: unknown): void; on(n: string, h: (e: unknown) => void): void } }).events;
+		const bus = (pi as unknown as { events: { emit(n: string, p: unknown): void; on(n: string, h: (e: unknown) => void): void } }).events;
 	const registration = { version: 1, component: definition, overwrite: true };
+	dbg("factory: emitting REGISTER");
 	bus.emit(REGISTER, registration);
+	dbg("factory: subscribing DISCOVER");
 	bus.on(DISCOVER, (event: unknown) => {
 		const ev = event as { register?: (c: unknown, o?: { overwrite?: boolean }) => void } | undefined;
 		if (ev && typeof ev.register === "function") ev.register(definition, { overwrite: true });
