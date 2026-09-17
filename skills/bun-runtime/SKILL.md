@@ -1,6 +1,6 @@
 ---
 name: bun-runtime
-description: "Bun-first rules for the fabric_exec bun-process guest: import ladder past scrubbed globals, decision ladder (Bun/Bun Shell vs pi.* escape hatches), crash rules (no JS timers), bounds. Load when writing fabric_exec TypeScript that runs commands or processes files/data."
+description: "Bun-first rules for the fabric_exec bun-process guest: import ladder past scrubbed globals, decision ladder (Bun/Bun Shell vs pi.* escape hatches), timer rules, bounds. Load when writing fabric_exec TypeScript that runs commands or processes files/data."
 ---
 
 # bun-runtime — Bun-first in the fabric_exec guest
@@ -11,8 +11,8 @@ Compose one program: gather → process → filter → return compact. **Bun is 
 `pi.*` host calls are typed escape hatches, not defaults.**
 
 ## Import ladder (globals are scrubbed)
-`globalThis` in the guest exposes almost nothing (plus a `setTimeout` that **crashes** —
-see below). Take APIs from modules; string-typed specifiers bypass the static typechecker:
+`globalThis` in the guest exposes almost nothing. Take APIs from modules; string-typed
+specifiers bypass the static typechecker:
 
 ```ts
 const bun: any = await import('bun' as string);      // Bun namespace: file, Glob, $, sqlite...
@@ -21,11 +21,14 @@ const fs: any = await import('node:fs' as string);   // Node compat works
 const { Database } = await import('bun:sqlite' as string);
 ```
 
-## THE crash rule
-`setTimeout`, `setInterval`, and timer-based `Promise.race` **crash the executor**
-(process exits 1, no result). Timeouts come from native mechanisms only: command flags
-(`curl --max-time 8`), `timeout N <cmd>`, `bun.spawn([...], { timeout })`, or the outer
-`fabric_exec` `timeoutMs`. Never JS timers.
+## Timer rules
+`setTimeout`/`setInterval` are intercepted by the host (`fabric.$timer` in
+`node-process-runtime.ts`, commit 738f721 / upstream PR monotykamary/pi-fabric#153) and
+resolve natively — they no longer crash the executor. Prefer native timeout mechanisms
+where simpler: command flags (`curl --max-time 8`), `timeout N <cmd>`,
+`bun.spawn([...], { timeout })`, or the outer `fabric_exec` `timeoutMs`. JS timers work
+but add a host round-trip per tick; for waits, `await bun.$`sleep N`.quiet()` or
+`pi.bash({cmd:'sleep N'})` avoid the round-trip.
 
 ## Decision ladder
 1. **Pure Bun/TS (default)** — `bun.file(p).text()/.json()`, `bun.write(p, data)`,
