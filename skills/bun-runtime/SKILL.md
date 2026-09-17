@@ -10,17 +10,22 @@ trips; in-guest work (fs, subprocesses, parsing, filtering, aggregation) is near
 Compose one program: gather → process → filter → return compact. **Bun is the default;
 `pi.*` host calls are typed escape hatches, not defaults.**
 
-## Import ladder (globals are scrubbed)
-`globalThis` in the guest exposes almost nothing. Take APIs from modules; string-typed
-specifiers bypass the static typechecker:
+## `__bun` is prebound — do NOT write the import ladder
+The bun-process runtime of our fork (@e4779/pi-fabric, upstream PR #154) binds the Bun
+module namespace as a `__bun` sandbox global. Use it directly:
 
 ```ts
-const bun: any = await import('bun' as string);      // Bun namespace: file, Glob, $, sqlite...
-const $ = bun.$;
-const fs: any = await import('node:fs' as string);   // Node compat works
-const { Database } = await import('bun:sqlite' as string);
+const stat = await __bun.file('/tmp/x.json').json();       // file I/O
+const rows = [...new __bun.Glob('**/*.ts').scanSync({ cwd: 'src' })];
+const t = await __bun.$`rg -n TODO src/`.quiet().text();   // shell
 ```
 
+`node:fs` / `node:os` / `bun:sqlite` and friends still come via string-typed imports:
+const fs: any = await import('node:fs' as string); const { Database } = await import('bun:sqlite' as string);
+
+Fallback (vanilla runtime, `typeof __bun === 'undefined'`): `const bun: any = await import('bun' as string)`
+and keep the examples below in terms of `bun.*`. On vanilla upstream runtimes even that
+import fails (ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING) — `__bun` is the only path there.
 ## Timer rules
 `setTimeout`/`setInterval` are intercepted by the host (`fabric.$timer` in
 `node-process-runtime.ts`, commit 738f721 / upstream PR monotykamary/pi-fabric#153) and

@@ -5,6 +5,7 @@ description: "Working in the Fabric bun-process guest (Bun 1.4): in-guest Bun AP
 
 # bun-runtime — ninja guide for the bun-process guest
 
+> **2026-09-17 — `__bun` prebound:** the fork runtime (@e4779/pi-fabric, upstream PR #154) binds the Bun namespace as `__bun`. Prefer `__bun.file/Glob/$/sqlite` directly; the import ladder shown below is the FALLBACK for vanilla runtimes where `__bun === undefined`.
 > Evidence: 2026-09-21 — archaeology over 368 pi sessions (memory provider) + live probes
 > against this guest (Bun 1.4.0). Claims marked *(docs)* come from official docs, everything
 > else was executed in the guest.
