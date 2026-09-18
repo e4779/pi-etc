@@ -19,35 +19,52 @@ pi install ~/dev/pi-etc -l
 
 ### Расширения (`extensions/`)
 
+> Расширение загружается, только если его файл прописан в `pi.extensions` в `package.json`.
+> Новое расширение = новый файл **и** запись в манифесте.
+
 | Расширение | Файл | Описание |
 |---|---|---|
 | **lint-check** | `extensions/lint-check/index.ts` | Запускает линтеры через nano-staged после каждого хода агента |
 | **qwen-flavor** | `extensions/qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
-| **co-author** | `extensions/co-author/index.ts` | Автоматически добавляет `Co-authored-by:` trailer к `git commit` по текущей модели. Маппинг model.id → identity в `~/.pi/agent/coauthors.json`, fallback — выводится из model.id |
+| **box** | `extensions/box/index.ts` | Distrobox-интеграция: тулы `box_list` / `box_exec` — ставить пакеты, собирать и тестировать в контейнере, а не на хосте. Создание/удаление боксов сознательно не автоматизировано (решение человека, см. `skills/box/SKILL.md`) |
+| **whoami** | `extensions/whoami/index.ts` | Инжектит идентичность модели в системный промпт (модели через API часто называют себя неправильно). Поведенческие профили — в `PROFILES` в `index.ts`, см. `extensions/whoami/README.md` |
+| **fabric-bun-guidance** | `extensions/fabric-bun-guidance/index.ts` | Подменяет дефолтное execution-руководство pi-fabric (slot `fabric.execution`) на Bun-first примеры на машинах с bun-process гостом |
+| **inject-default-skills** | `extensions/inject-default-skills/index.ts` | Always-on скиллы: инжектит выбранные скиллы целиком в системный промпт через `before_agent_start` (pi грузит скиллы лениво, и модели не всегда их поднимают) |
+| **context-guard** | `extensions/context-guard/index.ts` | Автоматически выносит слишком большие результаты `fabric_exec` из контекста модели: полный текст кладётся content-addressed на диск, модели остаётся дайджест + путь |
+| **llm** | `extensions/llm/index.ts` | Голый inference-примитив для госта `fabric_exec`: один completion за вызов, без тулов/памяти/оверхода сабагента — для map/reduce по уже имеющимся чанкам |
+| **co-author** | `extensions/co-author/index.ts` | ⚠️ Не зарегистрирован в манифесте `pi.extensions` — не загружается. Автоматически добавлял бы `Co-authored-by:` trailer к `git commit` по текущей модели (маппинг в `~/.pi/agent/coauthors.json`) |
+
+Общие хелперы расширений лежат в `extensions/lib/` (`fabric-detect.ts`).
 
 ### Скиллы (`skills/`)
 
 | Скилл | Команда | Описание |
 |---|---|---|
-| **pi-session** | `/skill:pi-session` | Парсинг и инспекция JSONL-сессий pi агента (summary, grep, context, timeline) |
+| **fabric-memory** | `/skill:fabric-memory` | Поиск и чтение старых сессий через memory-провайдер pi-fabric (`memory.recall / expand / walk / sessions`) в `fabric_exec`. Археология сессий. Заменяет pi-session — вручную JSONL не грепать |
+| **bun-runtime** | `/skill:bun-runtime` | Bun-first правила для bun-process госта `fabric_exec`: import ladder, выбор Bun Shell vs `pi.*`, таймеры, пустой вывод/exitCode. Глубокие рецепты — `REFERENCE.md` рядом |
+| **fabric-orchestration** | `/skill:fabric-orchestration` | Дерево решений для оркестрации в `fabric_exec`: напрямую / параллельный fan-out / рекурсивная декомпозиция; контракты верифаеров; mesh-биндинги между фазами |
 | **github** | `/skill:github` | GitHub через github MCP: поиск репо/кода/issue, PR, ревью, мердж |
-| **mcporter** | `/skill:mcporter` | Обзор mcporter CLI: discovery, вызов и управление MCP-серверами из терминала |
+| **mcporter** | `/skill:mcporter` | Обзор mcporter CLI: discovery, вызов и управление MCP-серверами |
 | **layout-check** | `/skill:layout-check` | Верификация CSS-вёрстки через Chrome DevTools |
-| **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP (без раздувания контекста на 18k токенов) |
+| **chrome-devtools** | `/skill:chrome-devtools` | Управление реальной вкладкой Chrome через chrome-devtools MCP |
 | **zai-mcp** | `/skill:zai-mcp` | Веб-поиск, страница→markdown, семантическое чтение GitHub-репо, OCR/анализ изображений и видео через 4 Z.AI MCP сервера |
 | **mcpls** | `/skill:mcpls` | Семантическая навигация по коду через LSP (mcpls MCP→LSP мост): определения, ссылки, символы, диагностики, ренейм-рефакторинг |
+| **grill** | `/skill:grill` | Сократические сессии проработки идеи: раунды интервью по одному вопросу, каждый раунд выращивает drawio-майндмапу; в конце — текстовый аутлайн |
+| **mindmap** | `/skill:mindmap` | Создание/выращивание/починка drawio-майндмап: центральный узел, цвет на ветку, органичные кривые |
+| **box** | `/skill:box` | Конвенции distrobox: что делается в боксе, что на хосте (пакеты — только в боксе, git — всегда на хосте) |
+| **skill-author** | `/skill:skill-author` | Авторство и валидация скиллов (SKILL.md): правила frontmatter, YAML-грабли, валидатор skills-ref |
+| **pi-session** | `/skill:pi-session` | *(legacy)* Парсинг и инспекция JSONL-сессий pi через `tools/pi-session.ts`. Заменён fabric-memory — остаётся для сред без pi-fabric |
 
-### Утилиты (`tools/`, `bin/`)
+### Утилиты (`tools/`)
 
 | Инструмент | Назначение |
 |---|---|
 | `tools/pi-session.ts` | CLI для инспекции сессий: `npx tsx tools/pi-session.ts --summary` |
 | `tools/install-hooks.mjs` | Ставит pre-commit хук (гейт `lint:skills`); запускается сам через `postinstall` при `npm install` |
 
-
 ## Селективное включение
 
-Пакет устанавливается целиком, но в настройках агента можно выбрать, какие расширения активировать.  
+Пакет устанавливается целиком, но в настройках агента можно выбрать, какие расширения и скиллы активировать.  
 Файл настроек: `~/.pi/agent/settings.json` → поле `packages`.
 
 ### Пример 1: всё включено
@@ -59,8 +76,6 @@ pi install ~/dev/pi-etc -l
   ]
 }
 ```
-
-Без фильтрации — pi загрузит все расширения из `extensions/**/*.ts` и все скиллы из `skills/`.
 
 ### Пример 2: только qwen
 
@@ -77,20 +92,24 @@ pi install ~/dev/pi-etc -l
 }
 ```
 
-### Пример 3: только скиллы, без расширений
+### Пример 3: всё, кроме… (негация)
+
+Запись с префиксом `-` **исключает** элемент из полного набора:
 
 ```json
 {
   "packages": [
     {
       "source": "git:git@gitverse.ru:e4779/pi-etc.git",
-      "extensions": []
+      "extensions": [
+        "-extensions/lint-check/index.ts",
+        "-extensions/qwen/index.ts"
+      ],
+      "skills": ["-skills/pi-session"]
     }
   ]
 }
 ```
-
-Расширения отключены, но скиллы всё равно доступны через `/skill:...`.
 
 ### Пример 4: конкретные скиллы
 
@@ -116,7 +135,7 @@ pi install ~/dev/pi-etc -l
     {
       "source": "git:git@gitverse.ru:e4779/pi-etc.git",
       "extensions": [
-        "extensions/qwen/index.ts"
+        "-extensions/lint-check/index.ts"
       ]
     },
     "npm:@tintinweb/pi-tasks",
@@ -141,7 +160,7 @@ pi install ~/dev/pi-etc -l
 git clone git@gitverse.ru:e4779/pi-etc.git
 cd pi-etc
 
-# Установить зависимости
+# Установить зависимости (+ pre-commit хук через postinstall)
 npm install
 
 # Проверить типы
@@ -150,53 +169,37 @@ npx tsc --noEmit
 # Проверить скиллы (frontmatter SKILL.md по спеке Agent Skills)
 npm run lint:skills
 
-# Тестировать локально (без установки)
-pi -e ~/dev/pi-etc/extensions/qwen/index.ts
+# Собрать одно расширение для быстрой проверки
+bun build extensions/whoami/index.ts --no-bundle
+
+# Тестировать расширение локально (без установки)
+pi -e extensions/qwen/index.ts
 ```
+
+Новое расширение: файл в `extensions/<name>/index.ts` **плюс регистрация** в `pi.extensions` в `package.json` — без записи в манифесте пакет его не отдаёт.
 
 ## Структура
 
 ```
 pi-etc/
-├── extensions/           # Расширения (одно .ts на расширение или вложенная директория)
-│   ├── co-author/
-│   ├── lib/                   # общие хелперы (fabric-detect.ts и др.)
-│   ├── lint-check/
-│   │   ├── index.ts
-│   │   └── README.md
-│   └── qwen/
-│       ├── index.ts
-│       ├── system-prompt.ts
-│       ├── edit-qwen.ts
-│       └── tool-call-extractor.ts
-├── skills/               # Скиллы (SKILL.md в поддиректориях)
-│   ├── pi-session/SKILL.md
-│   ├── github/SKILL.md
-│   ├── layout-check/
-│   │   ├── SKILL.md
-│   │   └── scripts/layoutProbe.mjs
-│   ├── chrome-devtools/
-│   │   ├── SKILL.md
-│   │   └── references/         # setup/tools/recipes — грузятся по требованию
-│   ├── mcporter/SKILL.md
-│   ├── mcpls/SKILL.md
-│   └── zai-mcp/
-│       ├── SKILL.md
-│       └── references/           # tools.md (13 tools) + recipes.md (7 сценариев)
-├── tools/                # CLI-утилиты
-│   ├── pi-session.ts          # инспекция сессий (--summary, --grep, --context, --timeline)
-│   └── pi-session.README.md
-├── themes/               # Темы (пока пусто)
-├── package.json
+├── extensions/        # Расширения: один index.ts или директория (+ README.md у сложных)
+│   ├── lib/           # общие хелперы (fabric-detect.ts)
+│   └── <9 расширений, см. таблицу выше>
+├── skills/            # Скиллы: skills/<name>/SKILL.md (+ references/, scripts/ по мере надобности)
+├── themes/            # Темы (пока пусто)
+├── tools/             # CLI-утилиты (pi-session.ts, install-hooks.mjs)
+├── package.json       # манифест пакета: pi.extensions / skills / themes
 ├── tsconfig.json
 └── TODO.md
 ```
+
+Актуальный состав: `ls extensions skills tools`.
 
 ## Зависимости
 
 - **runtime:** `diff`, `nano-staged`
 - **peer:** `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, `typebox`
-- **dev:** `typescript`
+- **dev:** `typescript`, `@earendil-works/pi-ai`
 
 Все peer-зависимости предоставляются самим pi-агентом, отдельно их ставить не нужно.
 
