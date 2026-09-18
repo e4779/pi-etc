@@ -1,6 +1,6 @@
 ---
 name: layout-check
-description: CSS layout verification via coordinate tables. Computes pairwise element relations (alignment, gap, overlap, misalign) from getBoundingClientRect. Use to verify layout fixes, check alignment, compare before/after CSS changes.
+description: "CSS layout verification via coordinate tables. Computes pairwise element relations (alignment, gap, overlap, misalign) from getBoundingClientRect. Use to verify layout fixes, check alignment, compare before/after CSS changes. RU: проверь вёрстку, съехала вёрстка, выравнивание, наложение элементов, сравни до/после."
 ---
 
 # Layout Check

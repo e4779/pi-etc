@@ -6,6 +6,7 @@ description: >-
   fabric_exec. Use for session archaeology — "что было в прошлой сессии",
   "find where we did X", cross-session history, past decisions and failures.
   Supersedes pi-session — never grep session JSONL by hand.
+  RU: прежде чем начинать задачу — проверь в памяти, не делали ли мы это уже; что решали в прошлых сессиях.
 ---
 
 # fabric-memory — session recall in Pi Fabric

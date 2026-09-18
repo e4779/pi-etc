@@ -6,6 +6,7 @@ description: >-
   before execution — interview rounds with one question at a time, each round
   growing a drawio mindmap canvas via the drawio MCP. Ends with a text outline
   ready for downstream specs or task cards. Not for implementation work.
+  RU: распарировать идею, продумать вслух до реализации, прояснить задачу вопросами.
 ---
 
 # Grill — question rounds growing a drawio mindmap

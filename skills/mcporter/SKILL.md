@@ -6,6 +6,7 @@ description: >
   ~/.mcporter/mcporter.json and are called as mcp.<server>.<tool>() natives
   inside fabric_exec. Use the CLI only for debugging, ad-hoc servers, and
   config surgery. Overview skill — per-server details live in their own skills.
+  RU: MCP-сервер не отвечает, неизвестный тул, конфиг mcporter, добавить сервер.
 ---
 
 # mcporter (fabric's MCP runtime)

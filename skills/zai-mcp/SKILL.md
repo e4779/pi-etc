@@ -7,6 +7,7 @@ description: >
   semantically, OCR a screenshot, analyze an image or video, or compare UI
   screenshots. Call native `mcp.zai_{search,reader,zread,vision}.*` inside
   fabric_exec — type-checked, no CLI spawn, schemas stay out of context.
+  RU: поищи в интернете, открой страницу как markdown, проанализируй скриншот или видео, репозиторий на GitHub.
 ---
 
 # Z.AI MCP (zai-search / zai-reader / zai-zread / zai-vision)

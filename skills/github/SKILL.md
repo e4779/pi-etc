@@ -6,6 +6,7 @@ description: >
   Use when the user asks to search GitHub, read a repo file without
   cloning, check issues/PRs, or file an issue/PR. Call native `mcp.github.*`
   inside fabric_exec — the 44-tool schema stays out of context.
+  RU: поищи на GitHub, открой файл/репозиторий без клонирования, создай issue или PR, проверь PR.
 ---
 
 # GitHub MCP (github)

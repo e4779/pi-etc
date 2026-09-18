@@ -8,6 +8,7 @@ description: >
   snapshots (every element gets a uid), click/fill/hover via uid, evaluate
   JS, read console & network, capture screenshots, run performance traces.
   Call `mcp.chrome_devtools.*` inside `fabric_exec` — type-checked, no CLI spawn.
+  RU: заскрейпить сайт, потестировать фронтенд, заполнить форму, скриншот страницы, ошибки консоли, запросы сети.
 ---
 
 # Chrome DevTools

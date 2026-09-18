@@ -1,6 +1,6 @@
 ---
 name: skill-author
-description: "Authoring and validating pi skills (SKILL.md). Use when creating, editing, or debugging a skill — covers frontmatter rules, required fields, YAML pitfalls, and the skills-ref validator. Triggers: create skill, new skill, SKILL.md, skill validation, frontmatter error, Nested mappings not allowed."
+description: "Authoring and validating pi skills (SKILL.md). Use when creating, editing, or debugging a skill — covers frontmatter rules, required fields, YAML pitfalls, and the skills-ref validator. Triggers: create skill, new skill, SKILL.md, skill validation, frontmatter error, Nested mappings not allowed. RU: создать скилл, новый SKILL.md, ошибка frontmatter, валидация скилла, nested mappings."
 ---
 
 # skill-author: creating and validating pi skills

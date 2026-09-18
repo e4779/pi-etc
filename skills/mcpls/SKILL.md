@@ -9,6 +9,7 @@ description: >
   diagnostics exist — not just find text occurrences. Works with Rust,
   TypeScript, Python, Go, C/C++, Zig and more. Register via `mcp.$register`,
   call `mcp.mcpls.*` inside `fabric_exec`.
+  RU: где определена функция, кто вызывает, найди референсы, тип символа, диагностика, безопасный rename.
 ---
 
 # mcpls (MCP→LSP bridge)

@@ -7,6 +7,7 @@ description: >
   always on the host, builds/tests/experiments inside the box. Default box:
   playground (debian:13). Boxes are created manually — the tools never
   create or remove them.
+  RU: поставить пакеты в контейнер, собрать или протестировать в изоляции, дистробокс.
 ---
 
 # box — distrobox integration
