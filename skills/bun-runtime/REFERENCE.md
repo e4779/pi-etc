@@ -137,3 +137,38 @@ House rules stay: foreign direct first, on hang/failure retry via proxy `<proxy-
 - Per command: native flags (`--max-time`, `timeout N`) or `bun.spawn({ timeout })`.
   **Never JS timers.**
 - Big outputs never returned raw: aggregate in-guest, return decisions + evidence.
+
+## Session-proven recipes (mined 2026-09-22 from 368 sessions; excludes everything above)
+
+| Practice | Recipe |
+|---|---|
+| Counts, not rows | `` $`gunzip -c f.gz | tail -n +2 | awk -F, '{print $3}' | sort | uniq -c | sort -rn` `` — aggregates hit context, raw rows never do |
+| One MCP-envelope parser | `const parse = (r: any) => r?.structuredContent ?? (typeof r === 'string' ? JSON.parse(r) : r);` — reuse across all mcp.* servers |
+| Heavy probes: belt + suspenders | `pi.bash({ cmd: 'doas timeout 500 bash -c … 2>&1 | tail -8', settle: true, timeout: 540 })` — inner `timeout`, outer bound, output pre-truncated |
+| N probes, one round-trip | sections `=== name ===` glued with `---SPLIT---` in one fabric_exec |
+| Tolerant inventory | `` $`ls ${dir} 2>&1`.nothrow().quiet().text().split('\n').slice(0, 30) `` — a missing dir must not kill the program |
+| Heavy deps without host pollution | `pi.write('/tmp/s.py')` → `` $`docker run --rm -v /tmp/s.py:/p.py:ro python:3.10-slim … | tail -2` `` |
+| Prove before delete | `git merge-base --is-ancestor main feat/x` before removing a merged branch |
+| Falsifying probes > trusting docs | three minimal zonds beat one stale always-on rule (a dead timer rule lived in AGENTS.md for days, verified 2026-09-22) |
+| jq over heterogeneous records | `jq -r '.type // .role // "?"'` walks mixed JSONL in one pass |
+
+## Loud-failure lessons (each paid for at least twice)
+
+1. **exitCode before stdout.** With `.nothrow()`, empty output at `exitCode ≠ 0` is NOT
+   "no matches" — it is a failed command. Two false "no repos on this machine" reports
+   were born from reading `.text()` first. Check exit, then read.
+2. **Glob patterns must be template literals.** `` $`ls ${g}` `` auto-escapes the variable →
+   the glob never expands (exit 1, 0 lines). Only a literal `` $`ls /path/*/` `` expands.
+   Multi-pattern `ls` where ONE pattern misses returns empty for ALL patterns
+   (bash would print partial results + errors).
+3. **pi.bash without `timeout` kills the whole program** — results of already-completed
+   steps are lost with it. Always set `timeout` on potentially slow calls.
+4. **`extensions.*` without `tools.describe` first** — `Unknown Fabric action` rejects the
+   program; pi.* results already computed inside it are lost too.
+5. **Reading a context-guard dump back in one bite re-projects it** — `pi.read` the dump
+   in slices < 8 KB (`limit`/`offset`). Verified 2026-09-22: a 9.8 KB read of a projected
+   dump got projected itself (recursion).
+6. **Big text inside `code` → typecheck refuses to run the program.** Pass payloads via
+   top-level `payloads`; quote git commit messages (`-m '…'`), never pass them as bare
+   arguments. `Promise.all` over differently-typed settle results typechecks the whole
+   program away — normalize shapes first.

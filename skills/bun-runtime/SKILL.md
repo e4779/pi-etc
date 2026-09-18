@@ -1,6 +1,6 @@
 ---
 name: bun-runtime
-description: "Bun-first rules for the fabric_exec bun-process guest: import ladder past scrubbed globals, decision ladder (Bun/Bun Shell vs pi.* escape hatches), timer rules, bounds. Load when writing fabric_exec TypeScript that runs commands or processes files/data."
+description: "Bun-first rules for the fabric_exec bun-process guest: import ladder past scrubbed globals, decision ladder (Bun/Bun Shell vs pi.* escape hatches), timer rules, bounds. Load when writing fabric_exec TypeScript that runs commands or processes files/data; when bun.$ returns empty output or 0 lines; when a guest program fails typecheck; when raw output must be filtered before it hits context; when choosing pi.bash vs in-guest shell. Triggers: пустой вывод, exitCode, typecheck-отказ, glob не разворачивается, фильтрация вывода."
 ---
 
 # bun-runtime — Bun-first in the fabric_exec guest
