@@ -23,6 +23,13 @@ description: "Decision tree for orchestrating work inside fabric_exec: direct wo
 - Parallel children: tracked background subsessions + `yield_to_subsessions` at joins — never a
   synchronous multi-minute fan-out inside one tool call (the operator sees nothing for hours).
 
+## Bare inference: extensions.llm
+- `extensions.llm({ prompt, system?, model?, maxTokens? })` — one completion, no tools/session.
+- Map/reduce over chunks you already hold: `Promise.all(chunks.map(c => extensions.llm({...})))`.
+- glm-5.3-flash ignores `reasoning: off` and burns 100–800 invisible reasoning tokens even on
+  trivial prompts — default budget 1024 covers it; results return as pi tool-result
+  `{ content, text, details }` (read `.text`).
+
 ## Pointers
 - Heavy playbooks: `/skill:fabric-workflow` (phases, pipelines, budgets), `/skill:fabric-rlm`
   (recursive context decomposition) — pi-fabric skillsets, explicit invocation by design.
