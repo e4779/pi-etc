@@ -20,7 +20,8 @@
       "./extensions/lint-check/index.ts",
       "./extensions/qwen/index.ts",
       "./extensions/whoami/index.ts",
-      "./extensions/context-guard/index.ts"
+      "./extensions/context-guard/index.ts",
+      "./extensions/llm/index.ts"
     ],
     "skills": [
       "./skills"
