@@ -1,0 +1,14 @@
+{
+  "name": "pi-web-diagrams-plugin",
+  "private": true,
+  "description": "Diagrams workspace panel for PI WEB: renders mermaid (.mmd) and draw.io (.drawio) files from the workspace",
+  "piWeb": {
+    "plugins": [
+      {
+        "id": "diagrams",
+        "browserRoot": ".",
+        "module": "pi-web-plugin.js"
+      }
+    ]
+  }
+}

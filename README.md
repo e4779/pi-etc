@@ -36,6 +36,14 @@ pi install ~/dev/pi-etc -l
 
 Общие хелперы расширений лежат в `extensions/lib/` (`fabric-detect.ts`).
 
+### PI WEB плагины (`pi-web-plugins/`)
+
+> Браузерные плагины pi-web: установка — symlink в `~/.pi-web/plugins/<id>` + жёсткая перезагрузка вкладки (плагинам с serverModule нужен ещё и рестарт sessiond). Контракт и примеры — `docs/plugins.md` в пакете pi-web.
+
+| Плагин | Описание |
+|---|---|
+| **diagrams** | Панель «Diagrams» в workspace: рендерит `diagrams/*.mmd` (mermaid@11) и `diagrams/*.drawio` (mxGraph GraphViewer), живой опрос 4 сек, ошибки рендера инлайн. Детали — `pi-web-plugins/diagrams/README.md` |
+
 ### Скиллы (`skills/`)
 
 | Скилл | Команда | Описание |
@@ -186,6 +194,7 @@ pi-etc/
 │   ├── lib/           # общие хелперы (fabric-detect.ts)
 │   └── <9 расширений, см. таблицу выше>
 ├── skills/            # Скиллы: skills/<name>/SKILL.md (+ references/, scripts/ по мере надобности)
+├── pi-web-plugins/    # браузерные плагины pi-web: diagrams (панель mermaid/drawio)
 ├── themes/            # Темы (пока пусто)
 ├── tools/             # CLI-утилиты (pi-session.ts, install-hooks.mjs)
 ├── package.json       # манифест пакета: pi.extensions / skills / themes

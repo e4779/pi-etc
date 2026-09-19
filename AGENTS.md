@@ -27,6 +27,12 @@ Mapping lives in `~/.pi/agent/coauthors.json`, not in this repo.
 See their source in `extensions/`. Each extension with non-trivial behavior
 has a `README.md` next to its `index.ts` — read it before editing.
 
+## PI WEB plugins
+
+Browser plugins for pi-web live in `pi-web-plugins/<id>/` and are installed
+by symlinking into `~/.pi-web/plugins/<id>` (tab reload picks up browser-only
+changes). See `pi-web-plugins/diagrams/README.md` for the diagrams panel.
+
 ## Skills
 
 Skills live in `skills/<name>/SKILL.md`. Validate frontmatter before
