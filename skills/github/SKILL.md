@@ -3,16 +3,16 @@ name: github
 description: >
   GitHub operations via the github MCP server: search repos/code/issues/PRs,
   read files without cloning, list and write issues/PRs, releases, commits,
-  branches. Use for ANY github.com touchpoint: a repo URL in the message,
-  "check CI/Actions runs", "latest release of X", "who maintains Y", "what
-  changed in Z", "who uses pattern P across GitHub" — before falling back to
-  anything else. Missing mcp.github.* entries in tools.list do NOT mean
-  missing tools (the list silently truncates) — call natives anyway. Never gh
-  CLI (not installed) and never raw curl against api.github.com — the one
-  sanctioned exception is the anonymous Actions REST via proxy documented in
-  the body. Not for local git work — use git CLI. RU: поищи на гитхабе, открой
-  файл/репозиторий без клонирования, проверь релизы или CI, найди issue или
-  PR, создай issue/PR.
+  branches, Actions/CI runs and logs. Use for ANY github.com touchpoint: a
+  repo URL in the message, "check CI runs", "latest release of X", "who
+  maintains Y", "what changed in Z", "who uses pattern P across GitHub" —
+  before falling back to anything else. Missing mcp.github.* entries in
+  tools.list do NOT mean missing tools (the list silently truncates) — call
+  natives anyway; CI/Actions = actions_list / actions_get /
+  actions_run_trigger / get_job_logs. Never gh CLI (not installed) and never
+  raw curl against api.github.com. Not for local git work — use git CLI. RU:
+  поищи на гитхабе, открой файл/репозиторий без клонирования, проверь релизы
+  или CI, найди issue или PR, создай issue/PR.
 ---
 
 # GitHub MCP (github)
@@ -48,28 +48,37 @@ const me = await mcp.github.get_me({});   // who am I? → auth works
 read/search and lightweight writes. For heavy local work (edit, commit, push),
 clone.
 
-## Actions / CI runs — no MCP tools; anonymous REST via proxy (verified 2026-09-19)
+## Actions / CI runs — native since 2026-09-19 (`--toolsets=default,actions`)
 
-The server binary (`~/bin/github-mcp-server stdio`) runs without the Actions
-toolset: `mcp.github.list_workflow_runs` → `Unknown Fabric action`. Don't burn
-turns on discovery — for workflow/CI questions go straight to anonymous REST
-through the proxy (read-only, no token sent; sanctioned exception to the
-no-raw-curl rule because no MCP client covers this surface):
+Method-style tools, like `issue_read`:
+
+| tool | purpose |
+|---|---|
+| `actions_list` | methods: list_workflows, list_workflow_runs, list_workflow_jobs, list_workflow_run_artifacts |
+| `actions_get` | methods: get_workflow, get_workflow_run, get_workflow_job, download_workflow_run_artifact, get_workflow_run_usage, get_workflow_run_logs_url |
+| `actions_run_trigger` | methods: run_workflow, rerun_workflow_run, rerun_failed_jobs, cancel_workflow_run, delete_workflow_run_logs |
+| `get_job_logs` | job logs — `job_id` for one job; `run_id` + `failed_only: true` for all failed; `return_content: true` to inline text |
 
 ```ts
-const bun: any = await import('bun' as string);
-const opt = { headers: { 'User-Agent': 'pi-agent',
-                          Accept: 'application/vnd.github+json' },
-              proxy: 'http://127.0.0.1:8888' } as any;
-const runs: any = await (await bun.fetch(
-  'https://api.github.com/repos/<owner>/<repo>/actions/runs?per_page=5', opt)).json();
-const jobs: any = await (await bun.fetch(
-  `https://api.github.com/repos/<owner>/<repo>/actions/runs/${runs.workflow_runs[0].id}/jobs`,
-  opt)).json();
+const runs: any = await mcp.github.actions_list({
+  method: "list_workflow_runs", owner: "earendil-works", repo: "pi", perPage: 5 });
+const jobs: any = await mcp.github.actions_list({
+  method: "list_workflow_jobs", owner: "earendil-works", repo: "pi",
+  resource_id: runs.workflow_runs[0].id });
+const logs: any = await mcp.github.get_job_logs({
+  owner: "earendil-works", repo: "pi", run_id: runs.workflow_runs[0].id,
+  failed_only: true, return_content: true });
 ```
 
-Anonymous limit is 60 req/h per IP — status checks yes, polling loops no.
-A GitHub-JSON 404 (body carries `documentation_url`) means "not on github.com",
+After editing the server `args` in `~/.mcporter/mcporter.json` — run
+`tools.call({ ref: "mcp.$reload" })`, otherwise the old tool catalog stays
+bound.
+
+Break-glass only (server down / toolset disabled again): anonymous REST via
+proxy — `GET https://api.github.com/repos/<o>/<r>/actions/runs` with headers
+`User-Agent` + `Accept: application/vnd.github+json`, Bun
+`fetch(url, { proxy: 'http://127.0.0.1:8888' })`; 60 req/h per IP. A
+GitHub-JSON 404 (body has `documentation_url`) means "not on github.com",
 not bot-blocking.
 
 ## Top tools
