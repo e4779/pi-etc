@@ -1,13 +1,19 @@
 ---
 name: zai-mcp
 description: >
-  Web search, page-to-markdown, GitHub repo knowledge, and image/video
-  analysis via four Z.AI MCP servers. Use when the user asks to search the
-  web, fetch a page as markdown, research a topic, read a GitHub repo
-  semantically, OCR a screenshot, analyze an image or video, or compare UI
-  screenshots. Call native `mcp.zai_{search,reader,zread,vision}.*` inside
-  fabric_exec — type-checked, no CLI spawn, schemas stay out of context.
-  RU: поищи в интернете, открой страницу как markdown, проанализируй скриншот или видео, репозиторий на GitHub.
+  Web search, page-to-markdown, and image/video analysis via four Z.AI MCP
+  servers (search / reader / zread / vision). Use whenever the task needs ANY
+  external or time-sensitive information: current docs or API references,
+  library versions and release notes, recent events, error messages from the
+  wild, package/framework comparisons — do not answer these from training data
+  and do not raw-fetch pages when the reader exists. Also: fetch a page as
+  markdown, research a topic, read a GitHub repo semantically, OCR a
+  screenshot, analyze an image or video, compare UI screenshots. Load this
+  skill BEFORE the first mcp.zai_* call — arg names are not guessable
+  (web_search_prime takes `search_query`; `query`/`num` fail typecheck) and
+  search results arrive double-encoded. RU: поищи в интернете, погугли, найди
+  актуальную информацию, проверь версию/релиз/документацию, разбери ошибку,
+  открой страницу как markdown, проанализируй скриншот или видео.
 ---
 
 # Z.AI MCP (zai-search / zai-reader / zai-zread / zai-vision)
