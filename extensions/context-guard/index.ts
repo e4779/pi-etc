@@ -21,7 +21,7 @@ import type { ExtensionAPI, ExtensionEvent } from "@earendil-works/pi-coding-age
  * details/audits are left untouched, so the TUI keeps rendering the full
  * result. failures are silent: any error passes the original result through.
  *
- * Config: PI_CONTEXT_GUARD_BYTES env (default 8192, 0 disables).
+ * Config: PI_CONTEXT_GUARD_BYTES env (default 16384, 0 disables).
  */
 
 type ToolResultEvent = Extract<ExtensionEvent, { type: "tool_result" }>;
@@ -31,7 +31,7 @@ interface ContentBlock {
 }
 
 const TOOL_NAME = "fabric_exec";
-const DEFAULT_THRESHOLD_BYTES = 8192;
+const DEFAULT_THRESHOLD_BYTES = 16384;
 const MAX_CACHE_FILES = 200;
 const PREVIEW_CHARS = 300;
 const MARKER = '"__projected":true';
