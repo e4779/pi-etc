@@ -28,7 +28,6 @@ pi install ~/dev/pi-etc -l
 | **qwen-flavor** | `extensions/qwen/index.ts` | Активирует Qwen Code системный промпт и edit-инструмент для Qwen-моделей |
 | **box** | `extensions/box/index.ts` | Distrobox-интеграция: тулы `box_list` / `box_exec` — ставить пакеты, собирать и тестировать в контейнере, а не на хосте. Создание/удаление боксов сознательно не автоматизировано (решение человека, см. `skills/box/SKILL.md`) |
 | **whoami** | `extensions/whoami/index.ts` | Инжектит идентичность модели в системный промпт (модели через API часто называют себя неправильно). Поведенческие профили — в `PROFILES` в `index.ts`, см. `extensions/whoami/README.md` |
-| **fabric-bun-guidance** | `extensions/fabric-bun-guidance/index.ts` | Подменяет дефолтное execution-руководство pi-fabric (slot `fabric.execution`) на Bun-first примеры на машинах с bun-process гостом |
 | **inject-default-skills** | `extensions/inject-default-skills/index.ts` | Always-on скиллы: инжектит выбранные скиллы целиком в системный промпт через `before_agent_start` (pi грузит скиллы лениво, и модели не всегда их поднимают) |
 | **context-guard** | `extensions/context-guard/index.ts` | Автоматически выносит слишком большие результаты `fabric_exec` из контекста модели: полный текст кладётся content-addressed на диск, модели остаётся дайджест + путь |
 | **llm** | `extensions/llm/index.ts` | Голый inference-примитив для госта `fabric_exec`: один completion за вызов, без тулов/памяти/оверхода сабагента — для map/reduce по уже имеющимся чанкам |

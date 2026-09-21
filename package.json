@@ -15,7 +15,6 @@
   "pi": {
     "extensions": [
       "./extensions/box/index.ts",
-      "./extensions/fabric-bun-guidance/index.ts",
       "./extensions/inject-default-skills/index.ts",
       "./extensions/lint-check/index.ts",
       "./extensions/qwen/index.ts",
