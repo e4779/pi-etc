@@ -57,7 +57,7 @@ Method-style tools, like `issue_read`:
 | `actions_list` | methods: list_workflows, list_workflow_runs, list_workflow_jobs, list_workflow_run_artifacts |
 | `actions_get` | methods: get_workflow, get_workflow_run, get_workflow_job, download_workflow_run_artifact, get_workflow_run_usage, get_workflow_run_logs_url |
 | `actions_run_trigger` | methods: run_workflow, rerun_workflow_run, rerun_failed_jobs, cancel_workflow_run, delete_workflow_run_logs |
-| `get_job_logs` | job logs — `job_id` for one job; `run_id` + `failed_only: true` for all failed; `return_content: true` to inline text |
+| `get_job_logs` | job logs — `job_id` for one job; `run_id` + `failed_only: true` for all failed; `return_content: true` to inline text. ids are NUMBERS — a string `run_id`/`resource_id` fails validation ("must be number") |
 
 ```ts
 const runs: any = await mcp.github.actions_list({
