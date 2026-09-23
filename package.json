@@ -20,6 +20,7 @@
       "./extensions/qwen/index.ts",
       "./extensions/whoami/index.ts",
       "./extensions/context-guard/index.ts",
+      "./extensions/skill-gate/index.ts",
       "./extensions/llm/index.ts"
     ],
     "skills": [
