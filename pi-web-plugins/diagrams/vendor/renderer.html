@@ -5,17 +5,19 @@
 <script src="viewer-static.min.js"></script>
 <style>
   body { margin: 0; background: #ffffff; }
+  body { padding-top: 30px; position: relative; }
+  .mxgraph {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: #ffffff;
+  }
   /* Pin the viewer container: mxGraph keeps writing explicit px width/height
      (sizeDidChange) and the toolbar follows container.offsetWidth, which made
      the toolbar oscillate between graph-width and full-width. !important pins
      the frame: content zooms/scrolls INSIDE it, the frame itself never moves. */
-  .mxgraph {
-    width: 100% !important;
-    height: 420px !important;
-    margin: 0 !important;
-    overflow: auto !important;
-    background: #ffffff;
-  }
+
   #err { white-space: pre-wrap; color: #c0392b; font: 13px/1.4 sans-serif; padding: 8px; }
 </style>
 </head>
