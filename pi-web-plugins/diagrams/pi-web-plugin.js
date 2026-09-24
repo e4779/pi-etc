@@ -97,7 +97,7 @@ class DrawioPreview extends HTMLElement {
       f.title = "Drawio diagram";
       f.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
       f.setAttribute("referrerpolicy", "no-referrer");
-      f.style.cssText = "display:block;width:100%;border:0;background:#ffffff;height:340px";
+      f.style.cssText = "display:block;width:100%;border:0;background:#ffffff;height:420px";
       this.appendChild(f);
       this._iframe = f;
       this._loaded = false;
@@ -109,8 +109,6 @@ class DrawioPreview extends HTMLElement {
         if (d.type === "drawio-ready") {
           this._loaded = true;
           this._post();
-        } else if (d.type === "drawio-rendered" && typeof d.height === "number" && Number.isFinite(d.height)) {
-          f.style.height = Math.min(1600, Math.max(120, d.height + 24)) + "px";
         } else if (d.type === "drawio-error") {
           try { inp?.fail?.(new Error(String(d.message ?? "drawio render failed"))); } catch { /* best effort */ }
         }
