@@ -1,13 +1,18 @@
-// pi-web-plugin.js — Diagrams workspace panel for PI WEB.
-// Renders diagrams/*.mmd (mermaid) and diagrams/*.drawio (draw.io viewer)
-// from the current workspace. Browser-only plugin (apiVersion 2).
+// pi-web-plugin.js — Diagrams plugin for PI WEB (apiVersion 4).
+//
+// 1) contentRenderer: draws ```drawio fences and .drawio files inline
+//    (chat, Files preview) inside a sandboxed iframe that runs the
+//    official viewer-static build.
+// 2) workspace panel: renders diagrams/*.mmd (mermaid) and
+//    diagrams/*.drawio from the workspace, live-polling every 4s.
 
 const MERMAID_URL = new URL("./vendor/mermaid.min.js", import.meta.url).href;
 const VIEWER_URL = new URL("./vendor/viewer-static.min.js", import.meta.url).href;
+const RENDERER_URL = new URL("./vendor/renderer.html", import.meta.url).href;
 const POLL_MS = 4000;
 const DIAGRAM_EXT = /\.(mmd|drawio)$/i;
 
-// ---------- vendor loaders ----------
+// ---------- vendor loaders (panel side) ----------
 
 const scriptPromises = new Map();
 function loadScript(src) {
@@ -60,10 +65,10 @@ async function ensureViewer() {
   return window.GraphViewer;
 }
 
-// ---------- workspace scanning ----------
+// ---------- workspace scanning (panel) ----------
 
 async function listDiagrams(files) {
-  const out = new Map(); // path -> entry
+  const out = new Map();
   for (const dir of ["diagrams", ""]) {
     try {
       const listing = await files.listFiles(dir);
@@ -79,7 +84,64 @@ async function listDiagrams(files) {
 
 const stampOf = (entry) => entry ? entry.path + ":" + (entry.size ?? "?") + ":" + (entry.modifiedAt ?? "?") : "";
 
-// ---------- custom element ----------
+// ---------- chat/Files renderer element (drawio) ----------
+
+class DrawioPreview extends HTMLElement {
+  set input(v) { this._input = v; if (this.isConnected) this._go(); }
+  set rendererUrl(v) { this._url = v; if (this.isConnected) this._go(); }
+
+  connectedCallback() {
+    this.style.display = "block";
+    if (!this._iframe) {
+      const f = document.createElement("iframe");
+      f.title = "Drawio diagram";
+      f.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
+      f.setAttribute("referrerpolicy", "no-referrer");
+      f.style.cssText = "display:block;width:100%;border:0;background:#ffffff;height:340px";
+      this.appendChild(f);
+      this._iframe = f;
+      this._loaded = false;
+      this._handler = (e) => {
+        if (e.source !== this._iframe?.contentWindow) return;
+        const d = e.data;
+        if (!d || typeof d !== "object" || !("type" in d)) return;
+        const inp = this._input;
+        if (d.type === "drawio-ready") {
+          this._loaded = true;
+          this._post();
+        } else if (d.type === "drawio-rendered" && typeof d.height === "number" && Number.isFinite(d.height)) {
+          f.style.height = Math.min(1600, Math.max(120, d.height + 24)) + "px";
+        } else if (d.type === "drawio-error") {
+          try { inp?.fail?.(new Error(String(d.message ?? "drawio render failed"))); } catch { /* best effort */ }
+        }
+      };
+      window.addEventListener("message", this._handler);
+      f.addEventListener("load", () => { this._loaded = true; this._post(); });
+      f.src = this._url ?? "";
+    }
+  }
+
+  disconnectedCallback() {
+    if (this._handler) window.removeEventListener("message", this._handler);
+    this._handler = null;
+    this._iframe = null;
+    this._loaded = false;
+  }
+
+  _go() { this._post(); }
+
+  _post() {
+    const inp = this._input;
+    if (!this._loaded || !this._iframe?.contentWindow || !inp || inp.signal?.aborted) return;
+    this._iframe.contentWindow.postMessage({ type: "drawio-render", xml: inp.text ?? "" }, "*");
+  }
+}
+
+if (typeof window !== "undefined" && window.customElements) {
+  if (!window.customElements.get("pi-web-drawio-preview")) window.customElements.define("pi-web-drawio-preview", DrawioPreview);
+}
+
+// ---------- workspace panel element ----------
 
 class DiagramsViewer extends HTMLElement {
   constructor() {
@@ -92,8 +154,6 @@ class DiagramsViewer extends HTMLElement {
     this._renderedStamp = "";
     this._renderSeq = 0;
     this._timer = null;
-    this._selectionMemo = new Map(); // workspace key -> path
-    this._holder = null;
   }
 
   set ctx(value) {
@@ -117,7 +177,6 @@ class DiagramsViewer extends HTMLElement {
   disconnectedCallback() {
     if (this._timer) clearInterval(this._timer);
     this._timer = null;
-    this._teardownViewer();
   }
 
   _wsKey() {
@@ -131,10 +190,10 @@ class DiagramsViewer extends HTMLElement {
       '<section class="toolbar">',
       '  <strong>Diagrams</strong>',
       '  <select style="flex:1;min-width:0" aria-label="Diagram file"></select>',
-      '  <button type="button" title="Refresh">↻</button>',
+      '  <button type="button" title="Refresh">\u21bb</button>',
       '</section>',
       '<section class="viewer" style="margin-top:8px">',
-      '  <p class="muted hint">loading…</p>',
+      '  <p class="muted hint">loading\u2026</p>',
       '  <div class="stage"></div>',
       '</section>',
     ].join("\n");
@@ -144,7 +203,6 @@ class DiagramsViewer extends HTMLElement {
     this._stage.style.cssText = "width:100%;max-height:72vh;min-height:120px;overflow:auto;background:#ffffff;border-radius:6px";
     this._select.addEventListener("change", () => {
       this._selected = this._select.value || null;
-      this._selectionMemo.set(this._wsKey(), this._selected);
       void this._renderSelected(true);
     });
     this.querySelector("button").addEventListener("click", () => void this._refresh(true));
@@ -168,13 +226,7 @@ class DiagramsViewer extends HTMLElement {
       this._listJson = json;
 
       if (this._selected && !files.some((f) => f.path === this._selected)) this._selected = null;
-      if (!this._selected) {
-        const memo = this._selectionMemo.get(this._wsKey());
-        this._selected =
-          memo && files.some((f) => f.path === memo)
-            ? memo
-            : (files[0] ? files[0].path : null);
-      }
+      if (!this._selected) this._selected = files[0] ? files[0].path : null;
       this._syncSelect();
 
       const sel = files.find((f) => f.path === this._selected) ?? null;
@@ -209,7 +261,7 @@ class DiagramsViewer extends HTMLElement {
     if (empty) {
       this._hint.hidden = false;
       this._hint.textContent =
-        "Нет диаграмм в workspace. Попросите агента создать diagrams/example.mmd (mermaid) или diagrams/example.drawio.";
+        "\u041d\u0435\u0442 \u0434\u0438\u0430\u0433\u0440\u0430\u043c\u043c \u0432 workspace. \u041f\u043e\u043f\u0440\u043e\u0441\u0438\u0442\u0435 \u0430\u0433\u0435\u043d\u0442\u0430 \u0441\u043e\u0437\u0434\u0430\u0442\u044c diagrams/example.mmd (mermaid) \u0438\u043b\u0438 diagrams/example.drawio.";
       this._stage.textContent = "";
     } else {
       this._hint.hidden = true;
@@ -234,10 +286,10 @@ class DiagramsViewer extends HTMLElement {
     this._setHint(false);
     if (!force && stamp === this._renderedStamp && this._stage.childNodes.length > 0) return;
     this._hint.hidden = false;
-    this._hint.textContent = "rendering " + this._selected + "…";
+    this._hint.textContent = "rendering " + this._selected + "\u2026";
     try {
       const file = await ctx.files.readFile(this._selected);
-      if (seq !== this._renderSeq) return; // superseded by a newer request
+      if (seq !== this._renderSeq) return;
       if (file.binary) throw new Error("binary file, cannot render");
       const content = file.content ?? "";
       if (/\.drawio$/i.test(this._selected)) await this._renderDrawio(content);
@@ -273,23 +325,17 @@ class DiagramsViewer extends HTMLElement {
 
   async _renderDrawio(xml) {
     const GraphViewer = await ensureViewer();
-    const doc = new DOMParser().parseFromString(xml, "text/xml");
-    if (!doc.documentElement || doc.documentElement.nodeName === "parsererror" || doc.querySelector("parsererror")) {
-      throw new Error("invalid drawio XML");
-    }
-    const root = doc.documentElement;
-
-    // Same file -> swap the model in place. No teardown, no flicker and no
-    // stale mxGraph instances (GraphViewer itself has no destroy()).
-    if (this._viewer && this._holder && this._holder.isConnected) {
+    if (this._viewer) {
       try {
-        this._viewer.setXmlNode(root);
-        return;
-      } catch { /* fall through to a clean rebuild */ }
+        const g = this._viewer.graph;
+        if (g && typeof g.destroy === "function") g.destroy();
+      } catch { /* best effort */ }
+      try {
+        if (typeof this._viewer.destroy === "function") this._viewer.destroy();
+      } catch { /* best effort */ }
     }
-    this._teardownViewer();
+    this._viewer = null;
     this._clearStage();
-
     const holder = document.createElement("div");
     holder.className = "mxgraph";
     holder.style.cssText = "width:100%;min-width:100%;min-height:300px";
@@ -303,27 +349,7 @@ class DiagramsViewer extends HTMLElement {
       }),
     );
     this._stage.appendChild(holder);
-    this._holder = holder;
     this._viewer = GraphViewer.createViewerForElement(holder);
-  }
-
-  _teardownViewer() {
-    if (this._viewer) {
-      try {
-        const g = this._viewer.graph;
-        if (g && typeof g.destroy === "function") g.destroy();
-      } catch { /* best effort */ }
-      try {
-        if (typeof this._viewer.destroy === "function") this._viewer.destroy();
-      } catch { /* best effort */ }
-    }
-    try {
-      if (this._holder && window.mxEvent && typeof window.mxEvent.release === "function") {
-        window.mxEvent.release(this._holder);
-      }
-    } catch { /* best effort */ }
-    this._viewer = null;
-    this._holder = null;
   }
 
   _clearStage() {
@@ -331,22 +357,36 @@ class DiagramsViewer extends HTMLElement {
   }
 }
 
-if (typeof window !== "undefined" && window.customElements && !window.customElements.get("diagrams-viewer")) {
-  window.customElements.define("diagrams-viewer", DiagramsViewer);
+if (typeof window !== "undefined" && window.customElements) {
+  if (!window.customElements.get("diagrams-viewer")) window.customElements.define("diagrams-viewer", DiagramsViewer);
 }
 
-// ---------- plugin definition ----------
+// ---------- plugin definition (apiVersion 4) ----------
 
 const plugin = {
-  apiVersion: 2,
+  apiVersion: 4,
   name: "Diagrams Plugin",
-  activate: ({ html, svg }) => ({
-    contributions: {
-      workspacePanels: [
-        {
-          id: "workspace.diagrams",
-          title: "Diagrams",
-          icon: svg`
+  requires: [{ pluginId: "pi-web", id: "content-rendering", version: 1, parse: () => undefined }],
+  activate: ({ html, svg }) => {
+    if (typeof window !== "undefined" && window.customElements && !window.customElements.get("diagrams-viewer")) {
+      window.customElements.define("diagrams-viewer", DiagramsViewer);
+    }
+    return {
+      contributions: {
+        contentRenderers: [
+          {
+            id: "drawio",
+            languages: ["drawio"],
+            fileExtensions: ["drawio"],
+            renderMode: "automatic",
+            render: (input) => html`<pi-web-drawio-preview .input=${input} .rendererUrl=${RENDERER_URL}></pi-web-drawio-preview>`,
+          },
+        ],
+        workspacePanels: [
+          {
+            id: "workspace.diagrams",
+            title: "Diagrams",
+            icon: svg`
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="7" height="7" rx="1"></rect>
               <rect x="14" y="14" width="7" height="7" rx="1"></rect>
@@ -354,13 +394,13 @@ const plugin = {
               <path d="M6.5 10v7.5H14"></path>
             </svg>
           `,
-          order: 650,
-          visible: ({ workspace }) => workspace.isMain !== false,
-          render: (context) => html`<diagrams-viewer .ctx=${context}></diagrams-viewer>`,
-        },
-      ],
-    },
-  }),
+            order: 650,
+            render: (context) => html`<diagrams-viewer .ctx=${context}></diagrams-viewer>`,
+          },
+        ],
+      },
+    };
+  },
 };
 
 export default plugin;

@@ -1,5 +1,18 @@
 # pi-web-diagrams-plugin
 
+Diagrams plugin for PI WEB (plugin **apiVersion 4**):
+
+- **contentRenderer** for ```drawio``` fences and .drawio files — renders
+  in chat and the Files preview inside a sandboxed iframe running the
+  official viewer-static build (renderMode: automatic)
+- **workspace panel** listing diagrams/*.mmd (mermaid@11) and
+  diagrams/*.drawio, live-polling every 4s
+
+Mermaid chat fences are covered by the bundled mermaid plugin; the
+panel renders them with the vendored mermaid@11.
+
+
+
 Diagrams workspace panel for PI WEB: renders `diagrams/*.mmd` (mermaid) and
 `diagrams/*.drawio` (draw.io viewer) from the current workspace, live-polling
 every 4s.
