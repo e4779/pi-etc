@@ -48,7 +48,6 @@ pi install ~/dev/pi-etc -l
 | Скилл | Команда | Описание |
 |---|---|---|
 | **fabric-memory** | `/skill:fabric-memory` | Поиск и чтение старых сессий через memory-провайдер pi-fabric (`memory.recall / expand / walk / sessions`) в `fabric_exec`. Археология сессий. Заменяет pi-session — вручную JSONL не грепать |
-| **bun-runtime** | `/skill:bun-runtime` | Bun-first правила для bun-process госта `fabric_exec`: import ladder, выбор Bun Shell vs `pi.*`, таймеры, пустой вывод/exitCode. Глубокие рецепты — `REFERENCE.md` рядом |
 | **fabric-orchestration** | `/skill:fabric-orchestration` | Дерево решений для оркестрации в `fabric_exec`: напрямую / параллельный fan-out / рекурсивная декомпозиция; контракты верифаеров; mesh-биндинги между фазами |
 | **github** | `/skill:github` | GitHub через github MCP: поиск репо/кода/issue, PR, ревью, мердж |
 | **mcporter** | `/skill:mcporter` | Обзор mcporter CLI: discovery, вызов и управление MCP-серверами |

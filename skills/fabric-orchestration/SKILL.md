@@ -1,6 +1,6 @@
 ---
 name: fabric-orchestration
-description: "Decision tree for orchestrating work inside fabric_exec: direct work vs parallel fan-out vs recursive decomposition; verifier contracts; mesh bindings between phases. Use when a task fans out into bounded workers, when parallel research or multi-phase audits exceed one pass, when material may not fit one context, or when results must survive handoffs between calls. Triggers: большой аудит, декомпозиция задачи, параллельные воркеры, фан-аут, не влезает в контекст, несколько агентов, проверь результат. Command-level recipes: bun-runtime skill. Deep playbooks: /skill:fabric-workflow, /skill:fabric-rlm."
+description: "Decision tree for orchestrating work inside fabric_exec: direct work vs parallel fan-out vs recursive decomposition; verifier contracts; mesh bindings between phases. Use when a task fans out into bounded workers, when parallel research or multi-phase audits exceed one pass, when material may not fit one context, or when results must survive handoffs between calls. Triggers: большой аудит, декомпозиция задачи, параллельные воркеры, фан-аут, не влезает в контекст, несколько агентов, проверь результат. Deep playbooks: /skill:fabric-workflow, /skill:fabric-rlm."
 ---
 
 # Fabric orchestration — choose the shape before you run
@@ -33,6 +33,5 @@ description: "Decision tree for orchestrating work inside fabric_exec: direct wo
 ## Pointers
 - Heavy playbooks: `/skill:fabric-workflow` (phases, pipelines, budgets), `/skill:fabric-rlm`
   (recursive context decomposition) — pi-fabric skillsets, explicit invocation by design.
-- Command-level recipes: bun-runtime skill → REFERENCE.md.
 - Session-level children: harness `spawn_subsession` (tracked, transcript available) vs in-guest
   `agents.run` (structured value result). Independent research → several children + yield.
