@@ -89,6 +89,11 @@ await memory.recall({
 
 // Full-entry reading with neighbors (session path comes from hit.follow args):
 await memory.expand({ session, indices: [12], before: 2, after: 2 });
+// before/after need EXACTLY ONE anchor: indices:[a,b] + before/after fails
+// with "requires exactly one resolved anchor" — one index with neighbors,
+// or many indices without them.
+// Entries can arrive truncated in multi-entry calls: check textRange.complete;
+// if false, re-expand that single index for the lossless full text.
 
 // Map/reduce over whole sessions (visitor may await nested calls; false stops):
 await memory.walk(args, async (entry, i) => { /* ... */ });
@@ -103,6 +108,8 @@ const c = await memory.sessions({ scope: 'global' });
 // c.sessions → [{id, file, cwd, mtime, entryCount, tier, branches}]
 // ⚠️ provider surface is non-enumerable: Object.keys(memory) shows only
 // `walk` — a missing key does NOT mean a missing verb.
+// Cross-machine catalog: memory.sessions({ source: 'laptop' }) lists the
+// shared-store sessions (mixed cwds from all hosts; count may be page-capped).
 ```
 
 ## Offload hygiene
