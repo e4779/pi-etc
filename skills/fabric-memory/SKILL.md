@@ -25,6 +25,9 @@ skill is the operational recipe layer on top.
 - NEVER locate or parse `~/.pi/agent/sessions/*.jsonl` yourself: follow calls
   carry integrity bindings (SHA-256 source hashes, lineage fingerprints) and
   stale sources are refused.
+- The store may be MULTI-MACHINE: with fs sources (`memory.sources` in
+  fabric.json — e.g. a shared `~/pi-memory/native` kept in sync by rsync),
+  other hosts' sessions are queryable via source-qualified calls (below).
 
 ## The #1 gotcha: scope
 
@@ -38,6 +41,23 @@ Old sessions need an explicit scope:
 `branches` defaults to `"active"` (each session's parent-linked path);
 pass `branches: "all"` to also search abandoned `/tree` siblings.
 
+## Source-qualified recall (multi-machine stores)
+
+`scope` selects among LOCAL sessions; `source` selects a registered fs source
+(shared store). They do not mix:
+
+```ts
+// other machines' sessions via the shared store — NO scope here:
+await memory.recall({ query: 'copyparty', source: 'laptop' });
+// mixing fails: "scope must name the selected source, one of its sessions,
+// or be omitted"
+```
+
+- `scope: 'global'` covers only locally indexed sessions — an empty local
+  recall says NOTHING about other machines; query the source explicitly.
+- Forked sessions duplicate entries across files (same text, different
+  sessionId) — dedup by snippet/entryId when building chronologies.
+
 ## Recipes
 
 ```ts
@@ -49,6 +69,9 @@ const r = await memory.recall({
 });
 // r.hits[].snippet, r.total pre-page count.
 // Full entry / cold-session resolution:  await tools.call(hit.follow)
+// Hit fields: sessionId (NOT `session`), index, entryId, tier, score,
+// follow:{ref,args}. Pass follow.args WHOLESALE into expand — it carries the
+// integrity binding (expectedSourceHash); do not hand-roll {session, indices}.
 // Continue pages while r.next !== null:  await tools.call(r.next)
 
 // Strict matching:
@@ -69,11 +92,26 @@ await memory.expand({ session, indices: [12], before: 2, after: 2 });
 
 // Map/reduce over whole sessions (visitor may await nested calls; false stops):
 await memory.walk(args, async (entry, i) => { /* ... */ });
+// walk args = same selector family as expand ({session, indices|entryRange,
+// before, after}) — there is NO `from`. A cap-based early stop (`return
+// rows.length < N`) silently truncates: the max seen index is where the
+// visitor STOPPED, not the session end. Need the true end? Counting pass:
+// let last = -1; await memory.walk({ session }, () => { last += 1; return true; });
 
-// Catalog:
-await memory.sessions({ scope: 'global' });
-// → [{id, file, cwd, mtime, entryCount, tier: 'hot'|'cold', branches}]
+// Catalog (returns an ENVELOPE, not a bare array):
+const c = await memory.sessions({ scope: 'global' });
+// c.sessions → [{id, file, cwd, mtime, entryCount, tier, branches}]
+// ⚠️ provider surface is non-enumerable: Object.keys(memory) shows only
+// `walk` — a missing key does NOT mean a missing verb.
 ```
+
+## Offload hygiene
+
+Keep recall projections small in-guest (few fields, snippets ~170 chars) so
+the result stays under the CE auto-offload threshold. If a big result DID
+offload, reading it back yields multiply-encoded envelopes (envelope → JSON
+→ quoted content) — prefer re-running a narrower recall over unwrapping
+handle ladders.
 
 ## Reading coverage: empty ≠ proof
 
