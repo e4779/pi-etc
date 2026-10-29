@@ -127,7 +127,7 @@ await mcp.chrome_devtools.navigate_page({ pageId: 1, type: "reload", ignoreCache
 // See — snapshot (a11y tree, primary view) or screenshot (colors/layout)
 await mcp.chrome_devtools.take_snapshot({ pageId: 1 });
 await mcp.chrome_devtools.take_snapshot({ pageId: 1, verbose: true });
-const tmp = "/tmp";
+const tmp = (await pi.bash({ cmd: "node -e 'console.log(require(\"os\").tmpdir())'" })).output.trim();
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
 
 // Interact (need a uid from a snapshot)
@@ -161,31 +161,49 @@ await mcp.chrome_devtools.close_page({ pageId: 2 });
 workspace root**, otherwise you get `Access denied: path … is not within any of
 the configured workspace roots`.
 
-### Where to save
+### Where to save — `os.tmpdir()` is the ONLY root by default
 
-| Location | Works? | Notes |
-|---|---|---|
-| `/tmp` | ✅ **default on this WSL box** | usual workspace root |
-| `$TMPDIR` | ✅ | fallback if `/tmp` is oddly configured |
-| project dir | ✅ | project root is a workspace root |
-| arbitrary paths | ❌ | `Access denied: path … is not within any of the configured workspace roots` |
+`chrome-devtools-mcp` (v1.12.0+) sets `DEFAULT_FILESYSTEM_ROOT = [os.tmpdir()]`.
+That is the **only** workspace root unless the server is launched with
+`--workspace=<path>`. The MCP `roots` capability from the client is ignored
+in practice. Consequence per OS:
 
-**Rule: save under `/tmp`** (this WSL box). If a path is rejected with
-`Access denied: … not within any of the configured workspace roots`, use
-`$TMPDIR` or the project dir.
+| OS | `os.tmpdir()` | What works | What does NOT |
+|---|---|---|---|
+| **WSL/Linux** | `/tmp` | `/tmp/…` | `$HOME`, project dir, arbitrary |
+| **macOS** | `$TMPDIR` (`/var/folders/<hash>/T/`) | `$TMPDIR/…` | `/tmp` (→ `/private/tmp`), `$HOME`, project dir |
+
+**⚠️ macOS trap:** `/tmp` is a symlink to `/private/tmp` and is NOT the
+`os.tmpdir()` root — it is rejected even though it "looks like" the temp dir.
+`$HOME` and the project directory are also rejected — they are not roots.
+Only `$TMPDIR` works. Verified 2026-10-28 on macOS 15.7.
+
+**Rule: always resolve `os.tmpdir()` first, don't hardcode `/tmp`.**
+Inside `fabric_exec` the temp dir is a host path — read it once with `pi.bash`
+and reuse (works on both WSL and macOS):
 
 ```ts
-const tmp = "/tmp";
+// Resolve the workspace root ONCE
+const tmp = (await pi.bash({ cmd: "node -e 'console.log(require(\"os\").tmpdir())'" })).output.trim();
+// WSL:  /tmp
+// macOS: /var/folders/0t/4rsp…/T/
 
-// Full page
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, filePath: `${tmp}/page.png` });
-// One element (by uid from a snapshot)
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, uid: "1_5", filePath: `${tmp}/el.png` });
-// Full scrollable page
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, fullPage: true, filePath: `${tmp}/full.png` });
-// Smaller payload (jpeg + downscale)
 await mcp.chrome_devtools.take_screenshot({ pageId: 1, format: "jpeg", quality: 70, filePath: `${tmp}/page.jpg` });
 ```
+
+If a path is rejected with `Access denied: … not within any of the configured
+workspace roots`, you used a hardcoded `/tmp` on macOS or a non-root path —
+switch to the resolved `os.tmpdir()` above. Do NOT retry `$HOME` or the
+project dir: they are not roots and will also fail.
+
+> **To broaden roots** (trusted local client only): launch the server with
+> `--workspace=<path>` (repeatable) or `--workspace=/` (deprecated, full FS).
+> This is a server-side flag in `~/.mcporter/mcporter.json` `mcpServers`,
+> not a runtime argument — edit the config and restart the server. Don't do
+> this for shared/CI environments.
 
 ### How to view the screenshot
 
@@ -238,7 +256,7 @@ Load these only when the task needs them — that's the whole point.
 ## Anti-patterns
 
 - ❌ `take_screenshot` to read text/DOM → use `take_snapshot` (cheaper, precise)
-- ❌ Screenshot paths outside workspace roots → `Access denied`; use `/tmp` on this box → see Screenshots section
+- ❌ Screenshot paths outside workspace roots → `Access denied`; resolve `os.tmpdir()` first (NOT hardcoded `/tmp` — fails on macOS) → see Screenshots section
 - ❌ Multiple `fill` calls for one form → use `fill_form` (one round-trip)
 - ❌ Guessing selectors when you have a `uid` → snapshot first, use the uid
 - ❌ **`evaluate_script` for actions** (`.click()`, `.value=`, `scrollTo`) → use `click` / `fill` / `press_key` (real events + snapshot)
