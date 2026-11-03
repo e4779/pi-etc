@@ -12,8 +12,11 @@ description: >-
 # fabric-memory — session recall in Pi Fabric
 
 Upstream truth: `memory-recall.md` in the installed pi-fabric package
-(`<~/.pi/agent/npm>/node_modules/pi-fabric/docs/memory-recall.md`). This
-skill is the operational recipe layer on top.
+(`~/.pi/agent/npm/node_modules/@e4779/pi-fabric/docs/memory-recall.md`).
+Exact verb schemas on demand: `tools.describe({ ref: 'memory.recall' })`
+(same for `memory.expand` / `memory.sessions`); `memory.walk` is a
+guest-only combinator — describe rejects it. This skill is the
+operational recipe layer on top.
 
 ## Mental model
 
@@ -57,6 +60,41 @@ await memory.recall({ query: 'copyparty', source: 'laptop' });
   recall says NOTHING about other machines; query the source explicitly.
 - Forked sessions duplicate entries across files (same text, different
   sessionId) — dedup by snippet/entryId when building chronologies.
+
+## Cold sessions and index budgets (verified 2026-11-03, 193MB fs source)
+
+- **Enumerate sources FIRST**: `rg -n 'sources' ~/.pi/agent/fabric.json`
+  (or try `memory.sessions({ source })`). With `source` set there is NO
+  filesystem fallback — a local-scope result says nothing about a source.
+- **fs-source session keys are ROOT-RELATIVE paths.** `sessions()` rows
+  carry `file: "memory-source:<id>/<root-relative-key>"`. Direct read
+  without any hit: `memory.expand({ source, session: '<key>', entryRange:
+  { first, last } })` (or `indices`). `entryRange` endpoints must be
+  valid normalized indices — no clamping, out-of-range errors.
+- `expand` **re-reads the source** — it works even for sessions the
+  index never saw (cold digest capped, `entryCount: 0`, outside sync
+  budget). A bare session id + source can SILENTLY return `entries: []`
+  for such sessions — always prefer the root-relative key.
+- **Discriminate `hit.kind`**: `'entry'` → `follow.args` go to
+  `memory.expand`; `'session'` (cold candidate) → `follow.args` go to
+  `memory.recall` (integrity-bound single-session page), whose entry
+  hits then expand normally.
+- **Cold digests cannot prove phrase adjacency or same-entry
+  co-location** — `queryMode: 'phrase'` / `queryMatch: 'all'` return
+  incomplete cold coverage, not hits. Probe a cold session with ONE rare
+  literal term (tokenized exact match against the digest vocabulary).
+- **Big archives index PARTIALLY per call.** Observed on a 193MB /
+  252-session source: 149 indexed, 103 stale, `coverage.reasons:
+  ['max_sync_source_bytes', 'max_entry_chars', 'max_files_touched']`.
+  Empty recall on such a source is NEVER authoritative. Playbook:
+  `memory.sessions({ source })` → pick by cwd/mtime → expand by key
+  directly; walking the whole session works too (`walk` follows expansion
+  pages and reassembles textRange).
+- Catalog caps surface in the envelope: `coverage.reasons:
+  ['source_coverage:fs_source_max_sessions']`, plus `staleSessions` /
+  `incompleteSessions` counts. Budgets (`maxSyncSourceBytes`,
+  `memory.maxSessions`, `memory.hotSessions`) live in host fabric.json —
+  raising them is the host owner's call, not the agent's.
 
 ## Recipes
 
@@ -109,7 +147,10 @@ const c = await memory.sessions({ scope: 'global' });
 // ⚠️ provider surface is non-enumerable: Object.keys(memory) shows only
 // `walk` — a missing key does NOT mean a missing verb.
 // Cross-machine catalog: memory.sessions({ source: 'laptop' }) lists the
-// shared-store sessions (mixed cwds from all hosts; count may be page-capped).
+// shared-store sessions (mixed cwds; NO next page — the envelope carries
+// coverage; a listing ceiling surfaces as source_coverage:fs_source_max_sessions).
+// Source-session rows: file = "memory-source:<id>/<root-relative-key>"
+// (use the key for expand, not the bare id).
 ```
 
 ## Offload hygiene
@@ -122,10 +163,16 @@ handle ladders.
 
 ## Reading coverage: empty ≠ proof
 
-`coverage.complete === false` lists reasons (`max_entry_chars`,
-`max_cold_cache_bytes`, `duplicate_entry_id`, `regex_timeout`, …). An empty
-result under incomplete coverage is NOT an authoritative no-match — narrow
-the query, or hydrate a cold candidate via `tools.call(hit.follow)`.
+`coverage.complete === false` lists reasons — verified in the wild:
+`max_entry_chars` (hot-text cut), `max_cold_cache_bytes`,
+`max_sync_source_bytes` (source indexed partially — 103 stale sessions
+on one archive), `source_coverage:fs_source_max_sessions` (catalog
+ceiling), `cold_structural_filter_requires_hydration`,
+`duplicate_entry_id`, `regex_timeout`; counts in `staleSessions` /
+`incompleteSessions`. An empty result under incomplete coverage is NOT
+an authoritative no-match — narrow the query, hydrate via
+`tools.call(hit.follow)`, or bypass the index entirely: expand by
+root-relative session key.
 
 ## Why not pi-session
 
