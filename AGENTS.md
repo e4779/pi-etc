@@ -53,6 +53,12 @@ npx tsc --noEmit     # type-check
 npm run lint:skills  # validate all SKILL.md frontmatter
 ```
 
+### Elisp
+
+Любой `.el` файл проходит гейт до коммита: `elisp-check [--fix] FILE.el`
+(check-parens → canonical indent → byte-compile). Без пройденного гейта
+elisp не пишется и не коммитится.
+
 Build a single extension to verify it compiles:
 
 ```bash

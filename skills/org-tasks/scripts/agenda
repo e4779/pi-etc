@@ -7,7 +7,7 @@ ROOT="${AGENDA_ROOT:-$PWD}"
 CMD="${1:-help}"
 if [ "$CMD" = "help" ]; then sed -n '2,3p' "$0"; exit 0; fi
 shift || true
-mapfile -t FILES < <(git -C "$ROOT" ls-files '*.org')
+mapfile -d '' -t FILES < <(git -C "$ROOT" ls-files -z '*.org')
 if [ "${#FILES[@]}" -eq 0 ]; then
   echo "agenda: no tracked .org files under $ROOT" >&2
   exit 2
@@ -19,7 +19,18 @@ case "$CMD" in
   agenda|todos)
     exec emacs --batch -l "$DIR/agenda.el" -- "$CMD" ;;
   id)
-    exec emacs --batch -l "$DIR/agenda.el" -- id "$@" ;;
+    FILE="${1:-}"; SUB="${2:-}"
+    if [ -z "$FILE" ] || [ -z "$SUB" ]; then
+      echo "usage: agenda id FILE SUBSTRING" >&2; exit 2
+    fi
+    HITS=$(awk -v mode="find" -v fsub="$SUB" -f "$DIR/views.awk" "$ROOT/$FILE" || true)
+    N=$(printf '%s\n' "$HITS" | grep -c . || true)
+    if [ "$N" -ne 1 ]; then
+      echo "refuse: $N candidate headings for '$SUB'" >&2
+      exit 4
+    fi
+    LINE=$(printf '%s\n' "$HITS" | cut -d: -f1)
+    exec emacs --batch -l "$DIR/agenda.el" -- stamp "$FILE" "$LINE" "$SUB" ;;
   list)
     STATE="${1:-}"
     if [ -n "$STATE" ]; then
@@ -27,8 +38,19 @@ case "$CMD" in
     else
       PAT="^[*]+[[:space:]]+(TODO|NEXT|WAITING|SOMEDAY|DONE|CANCELLED)([[:space:]]|:|$)"
     fi
-    for f in "${FILES[@]}"; do rg -n "$PAT" "$ROOT/$f" || true; done ;;
-  ready|blocked|graph|lint|debug)
+    rc=0
+    for f in "${FILES[@]}"; do
+      rg -n "$PAT" "$ROOT/$f" || { s=$?; [ "$s" -eq 1 ] || rc="$s"; }
+    done
+    exit "$rc" ;;
+  lint)
+    rc=0
+    for f in "${FILES[@]}"; do
+      if [ ! -s "$ROOT/$f" ]; then echo "$ROOT/$f:1: empty file"; rc=1; fi
+    done
+    if [ "$rc" -eq 1 ]; then exit 1; fi
+    exec awk -v mode="$CMD" -f "$DIR/views.awk" "${FILES[@]/#/$ROOT/}" ;;
+  ready|blocked|graph|debug)
     exec awk -v mode="$CMD" -f "$DIR/views.awk" "${FILES[@]/#/$ROOT/}" ;;
   *)
     echo "unknown command: $CMD" >&2

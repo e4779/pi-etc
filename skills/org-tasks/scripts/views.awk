@@ -3,31 +3,55 @@ BEGIN {
   split("DONE CANCELLED", d, " ")
   fin["DONE"] = 1; fin["CANCELLED"] = 1
   act["TODO"] = 1; act["NEXT"] = 1; act["WAITING"] = 1; act["SOMEDAY"] = 1
+  canon["TODO"] = 1; canon["NEXT"] = 1; canon["WAITING"] = 1; canon["SOMEDAY"] = 1
+  canon["DONE"] = 1; canon["CANCELLED"] = 1
 }
 FNR == 1 {
   if (NR > 1 && mode == "lint" && !hastodo) {
     printf "%s:1: no #+TODO: declaration\n", pfile
     wcount++
   }
+  if (NR > 1 && mode == "lint" && hastodo) {
+    for (c in canon) if (!(c in vocab)) {
+      printf "%s:1: declaration missing %s\n", pfile, c
+      wcount++
+    }
+  }
   pfile = FILENAME
   hastodo = 0
   sawcontent = 0
+  split("", vocab)
 }
 /^#\+TODO:/ {
   hastodo = 1
   rest = substr($0, 9)
   m = split(rest, v, " ")
-  for (k = 1; k <= m; k++) if (v[k] != "|") vocab[v[k]] = 1
+  for (k = 1; k <= m; k++) {
+    if (v[k] == "|") continue
+    vocab[v[k]] = 1
+    if (mode == "lint" && !(v[k] in canon)) {
+      printf "%s:%d: vocabulary divergence: %s\n", FILENAME, FNR, v[k]
+      wcount++
+    }
+  }
+}
+/^[[:space:]]*#[[:space:]]*\\+begin_/ { inblock = 1 }
+/^[[:space:]]*#[[:space:]]*\\+end_/ { inblock = 0 }
+!inblock && mode == "find" && !inblock && /^[*]+[[:space:]]/ && index($0, fsub) != 0 {
+  printf "%d:%s\n", FNR, $0
 }
 match($0, /^[[:space:]]*:ID:[[:space:]]*/) {
   id = substr($0, RSTART + RLENGTH); sub(/[[:space:]].*/, "", id)
-  idstate[id] = curstate
-  ientry[id] = cur
+  idcount[id]++
+  if (mode == "lint" && idcount[id] > 1)
+    printf "%s:%d: duplicate :ID: %s\n", FILENAME, FNR, id
+  if (!(id in idstate)) idstate[id] = cstate[cur]
+  if (!(id in ientry)) ientry[id] = cur
 }
-match($0, /^[[:space:]]*:BLOCKER:[[:space:]]*/) {
+!inblock && match($0, /^[[:space:]]*:BLOCKER:[[:space:]]*/) {
   if (cur != "") eblk[cur] = eblk[cur] " " substr($0, RSTART + RLENGTH)
 }
-/^[*]+[[:space:]]/ {
+!inblock && /^[*]+[[:space:]]/ {
   cur++
   curfile[cur] = FILENAME
   curline[cur] = FNR
@@ -55,6 +79,12 @@ END {
   if (mode == "lint" && !hastodo) {
     printf "%s:1: no #+TODO: declaration\n", pfile
     wcount++
+  }
+  if (mode == "lint" && hastodo) {
+    for (c in canon) if (!(c in vocab)) {
+      printf "%s:1: declaration missing %s\n", pfile, c
+      wcount++
+    }
   }
   for (i = 1; i <= cur; i++) {
     unres = ""; dang = ""

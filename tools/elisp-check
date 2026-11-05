@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# elisp-check - verification gate for elisp files (batch emacs, no interactive emacs needed).
+# usage: elisp-check [--fix] FILE.el [FILE.el...]
+#   1. check-parens                    (reader-level syntax)
+#   2. canonical indent oracle         (emacs reindents; diff = structural bug in hand-written code)
+#      --fix applies the canonical indent instead of failing
+#   3. byte-compile                    (semantic errors fail; warnings reported)
+# Rule: no .el file is committed without passing this gate.
+set -uo pipefail
+FIX=0
+if [ "${1:-}" = "--fix" ]; then FIX=1; shift; fi
+if [ $# -eq 0 ]; then echo "usage: elisp-check [--fix] FILE.el..." >&2; exit 2; fi
+TMP="$(mktemp /tmp/elc.XXXXXX)"
+trap 'rm -f "$TMP"' EXIT
+rc=0
+for f in "$@"; do
+  # 1. reader-level syntax
+  if ! emacs --batch --eval "(with-current-buffer (find-file-noselect \"$f\") (emacs-lisp-mode) (condition-case e (progn (check-parens) (princ \"ok\")) (error (princ (format \"%S\" e)) (kill-emacs 1))))" >/dev/null 2>&1; then
+    echo "FAIL(parens): $f"
+    rc=1
+    continue
+  fi
+  # 2. canonical indent oracle
+  cp "$f" "$TMP"
+  emacs --batch --eval "(let ((make-backup-files nil)) (with-current-buffer (find-file-noselect \"$f\") (emacs-lisp-mode) (indent-region (point-min) (point-max)) (write-region (point-min) (point-max) \"$f\") (kill-emacs 0)))" >/dev/null 2>&1
+  if ! diff -q "$TMP" "$f" >/dev/null 2>&1; then
+    if [ "$FIX" -eq 1 ]; then
+      echo "FIXED(indent): $f"
+    else
+      echo "FAIL(indent): $f - canonical indent differs (run: elisp-check --fix $f)"
+      cp "$TMP" "$f"
+      rc=1
+    fi
+  fi
+  # 3. byte-compile (errors fail; warnings reported)
+  out=$(emacs --batch -f batch-byte-compile "$f" 2>&1 | grep -v '^Wrote ' || true)
+  rm -f "${f}c" "${f}.elc"
+  if [ -n "$out" ]; then
+    if echo "$out" | grep -q 'Error:'; then
+      echo "FAIL(compile): $f"
+      echo "$out" | head -8
+      rc=1
+    else
+      echo "WARN(compile): $f"
+      echo "$out" | head -8
+    fi
+  fi
+done
+exit $rc

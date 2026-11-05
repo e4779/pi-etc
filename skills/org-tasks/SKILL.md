@@ -73,6 +73,12 @@ over the plain files. Run from the repo root (or set AGENDA_ROOT):
 Views are reactive: nothing is cached, every call re-reads the files.
 The only persistent cache is org-id-locations.
 
+## Elisp gate
+
+Любое изменение `scripts/*.el` проходит `elisp-check [--fix] FILE.el`
+(parens → canonical indent → byte-compile) до тестов. Гейт — часть
+определения готовности: красный гейт = код не существует.
+
 ## Limits
 
 - Batch mode assumes no interactive Emacs session owns these files. If one

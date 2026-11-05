@@ -28,6 +28,13 @@
    где есть тулчейн и тесты. Текущий 250-строчный файл уходит в git
    историю целиком, не чинится по кускам.
 
+** TODO AGENDA_ROOTS: кросс-репо объединение файлов в вьюхах
+
+  Сейчас вьюхи считаются по одному репо (git ls-files). Блокер на задачу
+  из другого репо = dangling warning, граф его рисует пунктиром. Если
+  появится реальная потребность — AGENDA_ROOTS как список корней:
+  объединить ls-files, резолвить id по объединению.
+
 ** SOMEDAY Тулчейн для elisp: ERT + flymake + package-lint
 
    Отложено. Пригодится, только если пойдём глубоко в elisp:
@@ -36,6 +43,15 @@
    package-lint и flymake в pre-commit, CI-прогон. Сейчас потребности
    нет — и это честное SOMEDAY, а не свалка.
 
+   Ресёрч 2026-11-06 (проверено, живое): eldev
+   (github.com/emacs-eldev/eldev) — проектный менеджер: lint/test/deps
+   batch-командами; elisp-lint (gonewest818/elisp-lint, MELPA) — batch
+   линтер; elisp-autofmt (NonGNU ELPA / yugaego) — канонический
+   форматтер. Builtin-гейт (elisp-check) покрывает наш масштаб;
+   eldev брать, когда появится второй elisp-проект или CI.
+
+* DONE elisp-check: гейт (parens → indent-oracle → byte-compile) в tools/
+  CLOSED: [2026-11-06 Fri 00:10]
 * DONE Первая версия CLI: 8 подкоманд проверены на фикстуре
   CLOSED: [2026-11-05 Thu 22:45]
   vocab, list, ready, blocked, deadlines 30, graph dot/mermaid,

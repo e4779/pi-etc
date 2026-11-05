@@ -48,6 +48,20 @@ org-todo-keywords-1 of each file. A file missing the #+TODO line silently
 drops out of state-based views. vocab lists per-file declarations; lint flags
 files without one.
 
+## awk: rule-pattern matches do not set RSTART
+
+In awk, a rule pattern `/re/` firing does NOT set RSTART/RLENGTH - only
+`match()` does. A heading rule using `substr($0, RSTART + RLENGTH)` after
+an earlier (failed) `match()` rule saw RSTART=0 and stored the whole line.
+Receipt: views.awk v1, all states empty. Fix: `sub()` on a copy of the line.
+
+## Same regex, different escape levels
+
+elisp string `"\\\\+begin_"` is regexp `\\+begin_` (literal plus); awk file
+text needs ONE backslash: `\\+begin_`. Shipping elisp-level escaping into
+awk silently matched backslashes instead of `#+begin_` - block tracking
+never engaged. Receipt: 2026-11-06, M4 chase.
+
 ## Batch vs live divergence
 
 If an interactive Emacs keeps unsaved buffers over the same files, batch views
