@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# agenda - org task views: native org via emacs --batch + plain-text shell views.
+# usage: [AGENDA_ROOT=DIR] agenda <agenda|todos|list|ready|blocked|graph|lint|id> [args]
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${AGENDA_ROOT:-$PWD}"
+CMD="${1:-help}"
+if [ "$CMD" = "help" ]; then sed -n '2,3p' "$0"; exit 0; fi
+shift || true
+mapfile -t FILES < <(git -C "$ROOT" ls-files '*.org')
+if [ "${#FILES[@]}" -eq 0 ]; then
+  echo "agenda: no tracked .org files under $ROOT" >&2
+  exit 2
+fi
+export AGENDA_ROOT="$ROOT"
+export AGENDA_FILES="$(printf '%s\n' "${FILES[@]}")"
+
+case "$CMD" in
+  agenda|todos)
+    exec emacs --batch -l "$DIR/agenda.el" -- "$CMD" ;;
+  id)
+    exec emacs --batch -l "$DIR/agenda.el" -- id "$@" ;;
+  list)
+    STATE="${1:-}"
+    if [ -n "$STATE" ]; then
+      PAT="^[*]+[[:space:]]+$STATE([[:space:]]|:|$)"
+    else
+      PAT="^[*]+[[:space:]]+(TODO|NEXT|WAITING|SOMEDAY|DONE|CANCELLED)([[:space:]]|:|$)"
+    fi
+    for f in "${FILES[@]}"; do rg -n "$PAT" "$ROOT/$f" || true; done ;;
+  ready|blocked|graph|lint|debug)
+    exec awk -v mode="$CMD" -f "$DIR/views.awk" "${FILES[@]/#/$ROOT/}" ;;
+  *)
+    echo "unknown command: $CMD" >&2
+    exit 2 ;;
+esac
