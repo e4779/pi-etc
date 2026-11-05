@@ -18,15 +18,14 @@
   (funcall func)
   (princ (buffer-string)))
 
-(defun agenda--stamp (file line substring)
-  "Stamp an org-id on the heading at LINE of FILE, guarded by SUBSTRING."
+(defun agenda--stamp (file line fulltext)
+  "Stamp an org-id on LINE of FILE, guarded by exact FULLTEXT match."
   (let ((path (expand-file-name file (agenda--root))))
     (with-current-buffer (find-file-noselect path)
       (goto-char (point-min))
       (forward-line (1- line))
       (if (and (org-at-heading-p)
-               (string-match-p (regexp-quote substring)
-                               (buffer-substring (point) (line-end-position))))
+               (string= (buffer-substring (point) (line-end-position)) fulltext))
           (progn
             (org-id-get (point) 'create)
             (save-buffer)
@@ -42,9 +41,9 @@
     ("todos" (agenda--print #'org-todo-list))
     ("stamp" (let ((file (pop command-line-args-left))
                    (line (pop command-line-args-left))
-                   (sub (pop command-line-args-left)))
-               (unless (and file line sub)
-                 (princ "usage: agenda stamp FILE LINE SUBSTRING\n")
+                   (fulltext (pop command-line-args-left)))
+               (unless (and file line fulltext)
+                 (princ "usage: agenda stamp FILE LINE FULLTEXT\n")
                  (kill-emacs 2))
-               (agenda--stamp file (string-to-number line) sub)))
+               (agenda--stamp file (string-to-number line) fulltext)))
     (_ (princ (format "unknown command: %s\n" (or cmd ""))) (kill-emacs 2))))
