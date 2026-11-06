@@ -60,6 +60,11 @@ cd "$FIX" && git init -q && git add -A && git -c user.email=a@b -c user.name=t c
 
 run() { AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" "$@" 2>/dev/null; }
 
+# --- gate: awk parse + static safety (research Tier A) ---
+VIEWS="$HERE/../scripts/views.awk"
+if awk -f "$VIEWS" /dev/null </dev/null 2>/dev/null; then ok 'gate: views.awk parses'; else bad 'gate: views.awk parse error'; fi
+if awk -safe -f "$VIEWS" /dev/null </dev/null 2>/dev/null; then ok 'gate: -safe static lint passes'; else bad 'gate: -safe rejected views.awk'; fi
+
 # --- matrix ---
 out=$(run ready)
 if contains 'Прогнать тесты на стенде' "$out" && contains 'Рестарт bcachefsbox' "$out"; then ok 'ready: resolved blocker leaves ready'; else bad 'ready: expected both NEXT tasks'; fi
@@ -80,6 +85,7 @@ if contains 'In' "$out" && contains 'Написать драйвер помпы'
 
 out=$(run graph)
 if contains 'digraph tasks' "$out" && contains '->' "$out"; then ok 'graph: DOT with edges'; else bad 'graph: missing DOT/edges'; fi
+if [ "$(printf '%s\n' "$out" | head -1)" = 'digraph tasks {' ]; then ok 'graph: valid DOT header first'; else bad 'graph: DOT header not first'; fi
 if contains 'style=dashed' "$out"; then ok 'graph: dashed unresolved node'; else bad 'graph: no dashed unresolved node'; fi
 
 out=$(run vocab)
@@ -89,6 +95,12 @@ AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" lint >/tmp/org-smoke-lint 2>/dev/null; e
 wn=$(grep -c ':' /tmp/org-smoke-lint || true)
 lc=$(grep -c 'undeclared keyword todo' /tmp/org-smoke-lint || true)
 if [ "$ec" -eq 1 ] && grep -q 'undeclared keyword TODO' /tmp/org-smoke-lint && grep -q 'undeclared keyword WAITING' /tmp/org-smoke-lint && grep -q ':PROPERTIES: not directly after heading' /tmp/org-smoke-lint && grep -q 'no #+TODO: declaration' /tmp/org-smoke-lint && grep -q 'dangling blocker' /tmp/org-smoke-lint && [ "$lc" -ge 1 ] && ! grep -q 'undeclared keyword SKILL' /tmp/org-smoke-lint; then ok "lint: heuristic + 5 classes (exit 1, $wn lines)"; else bad "lint: expected warning classes (exit=$ec, lowercase-warns=$lc)"; fi
+
+# --- cross-file state leak guard (regression: bcachefs false positives) ---
+printf '#+TODO: TODO NEXT WAITING SOMEDAY | DONE CANCELLED\n* TODO Trailing entry with body\nsome body text\n' > "$FIX/x1.org"
+printf '#+TODO: TODO NEXT WAITING SOMEDAY | DONE CANCELLED\n:PROPERTIES:\n:ID: filelevel-1\n:END:\n* DONE Fresh file entry\n' > "$FIX/x2.org"
+out=$(awk -v mode=lint -f "$VIEWS" "$FIX/x1.org" "$FIX/x2.org" 2>&1); ec=$?
+if [ "$ec" -eq 0 ] && [ -z "$out" ]; then ok 'lint: no cross-file state leak'; else bad "lint: cross-file leak (exit=$ec): $out"; fi
 
 # --- id flow ---
 out=$(AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" id notes.org "фейковый хединг" 2>/dev/null); ec=$?

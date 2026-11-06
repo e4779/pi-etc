@@ -1,39 +1,50 @@
-# views.awk - computed views over org files. POSIX awk (FreeBSD BWK ok).
-# modes: find (fsub) / vocab / list-support / ready / blocked / graph / lint
+# views.awk - computed views over org files. POSIX awk (FreeBSD BWK).
+# modes: find (fsub) / vocab / ready / blocked / graph / lint
+#
+# Line automaton, four ORTHOGONAL dimensions (do not merge into one state):
+#   inblock    - inside a #+begin_/#+end_ verbatim fence
+#   indrawer   - inside a :PROPERTIES:..:END: drawer of the current entry
+#   pend       - a heading is awaiting its :PROPERTIES: drawer (lint only)
+#   sawcontent - body content seen since the heading (defeats the drawer claim)
+# All four reset at FNR == 1 (cross-file leak fix) and on new headings.
+# Behavior contract: tests/smoke.sh (13 checks). Golden files: tests/.
+
 BEGIN {
   fin["DONE"] = 1; fin["CANCELLED"] = 1
   act["TODO"] = 1; act["NEXT"] = 1; act["WAITING"] = 1; act["SOMEDAY"] = 1
   canon["TODO"] = 1; canon["NEXT"] = 1; canon["WAITING"] = 1; canon["SOMEDAY"] = 1
   canon["DONE"] = 1; canon["CANCELLED"] = 1
 }
-FNR == 1 {
-  if (NR > 1 && mode == "lint" && !hastodo) {
-    printf "%s:1: no #+TODO: declaration\n", pfile
+
+function check_file_lint(fname,   c) {
+  if (!hastodo) {
+    printf "%s:1: no #+TODO: declaration\n", fname
+    wcount++
+    return
+  }
+  for (c in canon) if (!(c in vocab)) {
+    printf "%s:1: declaration missing %s\n", fname, c
     wcount++
   }
-  if (NR > 1 && mode == "lint" && hastodo) {
-    for (c in canon) if (!(c in vocab)) {
-      printf "%s:1: declaration missing %s\n", pfile, c
-      wcount++
-    }
-    for (c in vocab) if (!(c in canon)) {
-      printf "%s:1: vocabulary divergence: %s\n", pfile, c
-      wcount++
-    }
+  for (c in vocab) if (!(c in canon)) {
+    printf "%s:1: vocabulary divergence: %s\n", fname, c
+    wcount++
   }
+}
+
+FNR == 1 {
+  if (NR > 1 && mode == "lint") check_file_lint(pfile)
+  pend = 0; inblock = 0; indrawer = 0; sawcontent = 0
   pfile = FILENAME
-  nfseq++
-  fseq[nfseq] = FILENAME
+  nfseq++; fseq[nfseq] = FILENAME
   hastodo = 0
-  sawcontent = 0
-  indrawer = 0
   split("", vocab)
 }
+
 /^#\+TODO:/ {
   hastodo = 1
-  rest = substr($0, 9)
-  fdecl[FILENAME] = rest
-  m = split(rest, v, " ")
+  fdecl[FILENAME] = substr($0, 9)
+  m = split(fdecl[FILENAME], v, " ")
   for (k = 1; k <= m; k++) {
     if (v[k] == "|") continue
     vocab[v[k]] = 1
@@ -43,8 +54,12 @@ FNR == 1 {
     }
   }
 }
+
+# --- verbatim fences ---
 inblock && /^[[:space:]]*#[[:space:]]*\+end_/ { inblock = 0 }
 !inblock && /^[[:space:]]*#[[:space:]]*\+begin_/ { inblock = 1 }
+
+# --- property drawer contents ---
 !inblock && indrawer && /^[[:space:]]*:END:/ { indrawer = 0 }
 !inblock && cur != "" && indrawer && match($0, /^[[:space:]]*:ID:[[:space:]]*/) {
   id = substr($0, RSTART + RLENGTH); sub(/[[:space:]].*/, "", id)
@@ -60,9 +75,13 @@ inblock && /^[[:space:]]*#[[:space:]]*\+end_/ { inblock = 0 }
   gsub(/[[:space:]]+$/, "", blk)
   eblk[cur] = eblk[cur] " " blk
 }
+
+# --- find mode: real headings matching a literal substring ---
 mode == "find" && !inblock && /^[*]+[[:space:]]/ && index($0, fsub) != 0 {
   printf "%d:%s\n", FNR, $0
 }
+
+# --- new heading: reset entry state ---
 !inblock && /^[*]+[[:space:]]/ {
   cur++
   curfile[cur] = FILENAME
@@ -73,14 +92,17 @@ mode == "find" && !inblock && /^[*]+[[:space:]]/ && index($0, fsub) != 0 {
   split(txt, w, " ")
   w1 = w[1]
   cstate[cur] = (w1 ~ /^[A-Z]+$/) ? w1 : ""
-  uw = toupper(w1)
-  if (mode == "lint" && w1 != "" && (uw in canon) && !(w1 in vocab)) {
+  if (mode == "lint" && w1 != "" && toupper(w1) in canon && !(w1 in vocab)) {
     printf "%s:%d: undeclared keyword %s (canonical states are case-sensitive)\n", FILENAME, FNR, w1
     wcount++
   }
   pend = 1; pline = FNR; pfile2 = FILENAME; sawcontent = 0
 }
+
+# --- body content since heading defeats the drawer claim (planning lines and blank are neutral) ---
 pend && !inblock && $0 !~ /^[*]+[[:space:]]/ && $0 !~ /^[[:space:]]*:PROPERTIES:/ && $0 !~ /^[[:space:]]*(DEADLINE|SCHEDULED|CLOSED):/ && $0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*:/ { sawcontent = 1 }
+
+# --- drawer after heading: lint placement, open drawer ---
 /^[[:space:]]*:PROPERTIES:/ {
   if (mode == "lint" && pend) {
     if (sawcontent) {
@@ -91,21 +113,10 @@ pend && !inblock && $0 !~ /^[*]+[[:space:]]/ && $0 !~ /^[[:space:]]*:PROPERTIES:
   }
   if (!inblock) indrawer = 1
 }
+
 END {
-  if (mode == "lint" && !hastodo) {
-    printf "%s:1: no #+TODO: declaration\n", pfile
-    wcount++
-  }
-  if (mode == "lint" && hastodo) {
-    for (c in canon) if (!(c in vocab)) {
-      printf "%s:1: declaration missing %s\n", pfile, c
-      wcount++
-    }
-    for (c in vocab) if (!(c in canon)) {
-      printf "%s:1: vocabulary divergence: %s\n", pfile, c
-      wcount++
-    }
-  }
+  if (mode == "lint") check_file_lint(pfile)
+
   if (mode == "vocab") {
     for (i = 1; i <= nfseq; i++) {
       f = fseq[i]
@@ -113,6 +124,7 @@ END {
     }
     exit 0
   }
+
   for (i = 1; i <= cur; i++) {
     unres = ""; dang = ""; selfb = 0
     n = split(eblk[i], bs, " ")
@@ -129,14 +141,10 @@ END {
       printf "%s:%d %s\n", curfile[i], curline[i], curhead[i]
     if (mode == "lint") {
       if (dang != "") { printf "%s:%d: dangling blocker%s\n", curfile[i], curline[i], dang; wcount++ }
-      if (selfb) { printf "%s:%d: self-block %s\n", curfile[i], curline[i], curhead[i]; wcount++ }
-    }
-    if (mode == "graph" && (cstate[i] in act)) {
-      lbl = curhead[i]; gsub(/"/, "", lbl)
-      sub(/^[A-Z]+[[:space:]]+/, "", lbl)
-      printf "  n%d [label=\"%s (%s)\"];\n", i, lbl, cstate[i]
+      if (selfb) { printf "%s:%d: self-block\n", curfile[i], curline[i]; wcount++ }
     }
   }
+
   if (mode == "graph") {
     printf "digraph tasks {\n  rankdir=LR;\n"
     for (i = 1; i <= cur; i++) {
