@@ -2,7 +2,14 @@
 # agenda - org task views: native org via emacs --batch + plain-text shell views.
 # usage: [AGENDA_ROOT=DIR] agenda <agenda|todos|list|ready|blocked|graph|vocab|lint|id> [args]
 set -euo pipefail
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# resolve symlinks (~/bin/agenda -> skills/org-tasks/scripts/agenda) portably
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  LDIR="$(cd "$(dirname "$SELF")" && pwd)"
+  SELF="$(readlink "$SELF")"
+  case "$SELF" in /*) ;; *) SELF="$LDIR/$SELF" ;; esac
+done
+DIR="$(cd "$(dirname "$SELF")" && pwd)"
 ROOT="${AGENDA_ROOT:-$PWD}"
 CMD="${1:-help}"
 if [ "$CMD" = "help" ]; then sed -n '2,3p' "$0"; exit 0; fi

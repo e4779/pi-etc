@@ -48,6 +48,8 @@ cat > "$FIX/notes.org" <<'EOF'
 #+begin_src org
 * TODO фейковый хединг в блоке
 #+end_src
+* todo lowercase visible hazard
+* SKILL FEEDBACK секция документа
 * WAITING Ответ от upstream
 EOF
 cat > "$FIX/задачи.org" <<'EOF'
@@ -85,7 +87,8 @@ if contains 'TODO NEXT WAITING SOMEDAY | DONE CANCELLED' "$out" && contains 'з�
 
 AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" lint >/tmp/org-smoke-lint 2>/dev/null; ec=$?
 wn=$(grep -c ':' /tmp/org-smoke-lint || true)
-if [ "$ec" -eq 1 ] && grep -q 'undeclared keyword TODO' /tmp/org-smoke-lint && grep -q 'undeclared keyword WAITING' /tmp/org-smoke-lint && grep -q ':PROPERTIES: not directly after heading' /tmp/org-smoke-lint && grep -q 'no #+TODO: declaration' /tmp/org-smoke-lint && grep -q 'dangling blocker' /tmp/org-smoke-lint; then ok "lint: 5 classes caught (exit 1, $wn lines)"; else bad "lint: expected warning classes (exit=$ec)"; fi
+lc=$(grep -c 'undeclared keyword todo' /tmp/org-smoke-lint || true)
+if [ "$ec" -eq 1 ] && grep -q 'undeclared keyword TODO' /tmp/org-smoke-lint && grep -q 'undeclared keyword WAITING' /tmp/org-smoke-lint && grep -q ':PROPERTIES: not directly after heading' /tmp/org-smoke-lint && grep -q 'no #+TODO: declaration' /tmp/org-smoke-lint && grep -q 'dangling blocker' /tmp/org-smoke-lint && [ "$lc" -ge 1 ] && ! grep -q 'undeclared keyword SKILL' /tmp/org-smoke-lint; then ok "lint: heuristic + 5 classes (exit 1, $wn lines)"; else bad "lint: expected warning classes (exit=$ec, lowercase-warns=$lc)"; fi
 
 # --- id flow ---
 out=$(AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" id notes.org "фейковый хединг" 2>/dev/null); ec=$?

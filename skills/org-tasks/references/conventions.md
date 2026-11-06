@@ -13,7 +13,10 @@ per-file divergence destroys computed views. Freeze it per repo in the
 
 - Capture lands as TODO (first keyword = default for new entries).
 - Promote to NEXT only when the task is actually actionable next.
-- WAITING must name its waiter in the body ("on review by X", "on upstream fix").
+- WAITING must name its waiter in the body ("on review by X",
+  "on upstream fix"). The waiter may be a non-person: a log event, an
+  upstream release, incoming data - anything you cannot start until
+  it happens.
 - SOMEDAY is the dream parking lot; review rarely. If the backlog is small
   enough that you never confuse dreams with commitments, SOMEDAY may be
   dropped - decide per repo, once.

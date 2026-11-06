@@ -73,8 +73,9 @@ mode == "find" && !inblock && /^[*]+[[:space:]]/ && index($0, fsub) != 0 {
   split(txt, w, " ")
   w1 = w[1]
   cstate[cur] = (w1 ~ /^[A-Z]+$/) ? w1 : ""
-  if (mode == "lint" && w1 != "" && w1 == toupper(w1) && w1 != tolower(w1) && !(w1 in vocab)) {
-    printf "%s:%d: undeclared keyword %s\n", FILENAME, FNR, w1
+  uw = toupper(w1)
+  if (mode == "lint" && w1 != "" && (uw in canon) && !(w1 in vocab)) {
+    printf "%s:%d: undeclared keyword %s (canonical states are case-sensitive)\n", FILENAME, FNR, w1
     wcount++
   }
   pend = 1; pline = FNR; pfile2 = FILENAME; sawcontent = 0
