@@ -1,28 +1,13 @@
 ---
 name: shell-taste
-description: "Taste layer for shell code: when to use sh at all, portable POSIX idioms vs host-shell extras, composability discipline, pre-delivery ritual. Use when writing, reviewing, or refactoring any #!/bin/sh or bash script, rc.d-style service scripts, CLI glue. RU: написать шелл-скрипт, идиоматичный sh, красивый шелл, переписать скрипт на sh, когда не использовать шелл."
+description: "Taste layer for shell code: portable POSIX idioms vs host-shell extras, composability discipline, pre-delivery ritual. Use when writing, reviewing, or refactoring any #!/bin/sh or bash script, rc.d-style service scripts, CLI glue. RU: написать шелл-скрипт, идиоматичный sh, красивый шелл, переписать скрипт на sh."
 ---
 
 # shell-taste
 
-The first rule of taste: choose the layer *before* writing a single line.
+How to write shell *well*: dialect discipline, a hard floor, idioms, a ritual.
 
-## 1. Layer gate — maybe don't write sh
-
-| Task shape | Tool |
-|---|---|
-| Glue: chaining standard utils, files, processes, pipelines | sh |
-| Nonstandard data wrangling, structures, JSON | ruby / jq (not sh) |
-| Distribution: send something that just works | compiled binary (go/rust) |
-| Web, floats, real arrays, recursion | not sh — say so |
-
-Stop signals (wrong tool — tell the user, don't heroically write sh):
-- needs arrays or nested data structures → ruby/python/jq
-- float math, complex date arithmetic → not sh
-- >100 lines or >2 levels of quoting → split or switch language
-- a for-loop over lines where grep/sed/awk/tr does it in one process = bad taste; toolbox first
-
-## 2. Dialect — portable core by default
+## 1. Dialect — portable core by default
 
 Two tiers; pick deliberately. Host-local scripts mark `# dialect: host` on line 2.
 
@@ -43,10 +28,10 @@ Portability matrix (probed live on labhost 2026-11; dash column from upstream do
 
 ksh93 has no `local` (use `typeset`).
 
-If correctness *needs* pipefail: restructure (check exit codes explicitly,
-`cmd || exit`, while-read loops) — or it is not a sh task.
+If correctness *needs* pipefail: restructure — check exit codes explicitly
+(`cmd || exit`, while-read loops) instead of leaning on a non-portable option.
 
-## 3. Hard floor (never cross)
+## 2. Hard floor (never cross)
 
 - Quote every expansion; `"$@"` never unquoted `$*`; printf, never echo
 - Read lines: `while IFS= read -r line` — never parse `ls`
@@ -56,7 +41,7 @@ If correctness *needs* pipefail: restructure (check exit codes explicitly,
 - No eval outside data-convention frameworks (rc.subr pattern); never eval user input
 - Shebang is a decision: `#!/bin/sh` default; `#!/usr/bin/env bash` only with an inline reason
 
-## 4. Idioms (the canon)
+## 3. Idioms (the canon)
 
 Verbs as functions returning via stdout; case = pattern dispatch;
 `${var#pat}` / `${var%%pat}` before sed; heredocs for generated files;
@@ -71,15 +56,15 @@ trap cleanup EXIT INT TERM
 tmp=$(mktemp -d) || die mktemp
 ```
 
-## 5. Ritual before delivering
+## 4. Ritual before delivering
 
 1. `shfmt -ln posix -s` — apply its rewrite; it enforces idiom mechanically
 2. shellcheck clean (the shell-gate extension already guards this)
 3. Read every unquoted $var aloud; cannot justify it → quote it
 4. If the user is taste-learning: offer an A/B variant (toolbox vs loop) and let them pick
 
-## 6. Canon (consult on demand)
+## 5. Canon (consult on demand)
 
 kn concept `~/kn/bundles/common/expressive-shell.md` · pure-sh-bible
 (dylanaraps) · Wooledge wiki (BashPitfalls, BashFAQ/105) · kiss, `/etc/rc.d/*`
-on this host · user's layer rule: utils→sh, wrangling→ruby, distribution→go.
+on this host.
