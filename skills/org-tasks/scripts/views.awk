@@ -80,7 +80,7 @@ mode == "find" && !inblock && /^[*]+[[:space:]]/ && index($0, fsub) != 0 {
   }
   pend = 1; pline = FNR; pfile2 = FILENAME; sawcontent = 0
 }
-pend && !inblock && $0 !~ /^[[:space:]]*:PROPERTIES:/ && $0 !~ /^[[:space:]]*(DEADLINE|SCHEDULED|CLOSED):/ && $0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*:/ { sawcontent = 1 }
+pend && !inblock && $0 !~ /^[*]+[[:space:]]/ && $0 !~ /^[[:space:]]*:PROPERTIES:/ && $0 !~ /^[[:space:]]*(DEADLINE|SCHEDULED|CLOSED):/ && $0 !~ /^[[:space:]]*$/ && $0 !~ /^[[:space:]]*:/ { sawcontent = 1 }
 /^[[:space:]]*:PROPERTIES:/ {
   if (mode == "lint" && pend) {
     if (sawcontent) {
