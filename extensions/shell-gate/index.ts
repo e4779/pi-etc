@@ -69,7 +69,7 @@ type WasmInstance = {
 };
 
 const DEFAULT_SUPPRESSED = ["SC1090", "SC1091", "SC2148"];
-const DEFAULT_CMD_SUPPRESSED = ["SC2154"];
+const DEFAULT_CMD_SUPPRESSED = ["SC2154", "SC2012", "SC1083", "SC2009"];
 const SEVERITY_RANK: Record<string, number> = { style: 0, info: 1, warning: 2, error: 3 };
 const SHELL_METACHARS = /[$\"\\`|&;<>()\n]/;
 
@@ -120,14 +120,43 @@ function bashParseError(cmd: string): string | null {
 let wasmInit: Promise<WasmInstance> | null = null;
 let wasmWarned = false;
 
+let consolePatched = false;
+let origWarn: ((...a: unknown[]) => void) | null = null;
+let origLog: ((...a: unknown[]) => void) | null = null;
+const WASM_CHATTER = /^\[shellcheck std(?:out|err)\]/;
+
+/**
+ * shellcheck-wasm wires the WASI fds to console.log/console.warn with
+ * "[shellcheck stdout/stderr]" prefixes. In pi those calls render as error
+ * events and shred the TUI. Drop exactly that prefix globally; every other
+ * message passes through untouched. PI_SHELL_GATE_DEBUG=1 keeps the chatter.
+ */
+export function patchConsole(): void {
+  if (consolePatched || process.env.PI_SHELL_GATE_DEBUG === "1") return;
+  origWarn = console.warn;
+  origLog = console.log;
+  console.warn = (...args: unknown[]) => {
+    if (WASM_CHATTER.test(String(args[0] ?? ""))) return;
+    origWarn?.(...args);
+  };
+  console.log = (...args: unknown[]) => {
+    if (WASM_CHATTER.test(String(args[0] ?? ""))) return;
+    origLog?.(...args);
+  };
+  consolePatched = true;
+}
+
 function warnOnce(msg: string): void {
-  if (!wasmWarned) {
+  // Silent by default: console.error renders as an error event in the TUI.
+  if (!wasmWarned && process.env.PI_SHELL_GATE_DEBUG === "1") {
     wasmWarned = true;
     console.error("[shell-gate] " + msg);
   }
+  wasmWarned = true;
 }
 
 async function getWasm(): Promise<WasmInstance | null> {
+  patchConsole();
   if (!wasmInit) {
     try {
       const mod = await import("shellcheck-wasm");
@@ -196,14 +225,44 @@ export function formatReason(what: string, issues: Issue[], maxIssues: number): 
   return head + lines.join("\n");
 }
 
+/**
+ * Retry valve: the first attempt at a command is checked (and blocked with
+ * diagnostics if dirty). An IDENTICAL retry passes unchecked — the model
+ * already got its lesson, and re-blocking the same string only spams the
+ * TUI event tail and burns turns. A genuinely fixed command has a different
+ * string and gets checked fresh. Counters reset per session.
+ */
+const blockCounts = new Map<string, number>();
+
+export function shouldPassRepeat(cmd: string): boolean {
+  const key = cmd.slice(0, 300);
+  const n = (blockCounts.get(key) ?? 0) + 1;
+  blockCounts.set(key, n);
+  return n > 1;
+}
+
 export default function shellGate(pi: ExtensionAPI): void {
   const cfg = loadConfig();
   if (process.env.PI_SHELL_GATE === "off" || cfg.enabled === false) return;
+
+  pi.on("session_start", async () => {
+    blockCounts.clear();
+  });
+
+  pi.on("session_shutdown", async () => {
+    blockCounts.clear();
+    if (consolePatched && origWarn && origLog) {
+      console.warn = origWarn;
+      console.log = origLog;
+    }
+    consolePatched = false;
+  });
 
   pi.on("tool_call", async (event) => {
     if (isToolCallEventType("bash", event)) {
       const cmd = event.input.command;
       if (typeof cmd !== "string" || cmd.trim().length === 0) return;
+      if (shouldPassRepeat(cmd)) return;
       if (cfg.syntaxCheck !== false) {
         const parseErr = bashParseError(cmd);
         if (parseErr) return { block: true, reason: "shell-gate: bash cannot parse this — fix before running:\n" + parseErr };
