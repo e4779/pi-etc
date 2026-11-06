@@ -5,7 +5,10 @@ description: "Taste layer for shell code: portable POSIX idioms vs host-shell ex
 
 # shell-taste
 
-How to write shell *well*: dialect discipline, a hard floor, idioms, a ritual.
+How to write shell *well*: dialect discipline, idioms, a ritual.
+The objective floor is shellcheck — the eslint of shell (rule codes SC####,
+severity levels, enable/disable config, inline pragmas) — driven by this
+skill's `.shellcheckrc`.
 
 ## 1. Dialect — portable core by default
 
@@ -31,17 +34,7 @@ ksh93 has no `local` (use `typeset`).
 If correctness *needs* pipefail: restructure — check exit codes explicitly
 (`cmd || exit`, while-read loops) instead of leaning on a non-portable option.
 
-## 2. Hard floor (never cross)
-
-- Quote every expansion; `"$@"` never unquoted `$*`; printf, never echo
-- Read lines: `while IFS= read -r line` — never parse `ls`
-- Lists = positional params: `set --` / `shift` / `"$@"`; no string+IFS emulated lists
-- `trap cleanup EXIT INT TERM`; mktemp for temp files; `rm -rf` only on absolute quoted paths
-- `cd dir || exit`; usage() in every script; exit codes are the API
-- No eval outside data-convention frameworks (rc.subr pattern); never eval user input
-- Shebang is a decision: `#!/bin/sh` default; `#!/usr/bin/env bash` only with an inline reason
-
-## 3. Idioms (the canon)
+## 2. Idioms (the canon)
 
 Verbs as functions returning via stdout; case = pattern dispatch;
 `${var#pat}` / `${var%%pat}` before sed; heredocs for generated files;
@@ -56,14 +49,23 @@ trap cleanup EXIT INT TERM
 tmp=$(mktemp -d) || die mktemp
 ```
 
-## 4. Ritual before delivering
+## 3. Ritual before delivering
 
 1. `shfmt -ln posix -s` — apply its rewrite; it enforces idiom mechanically
-2. shellcheck clean (the shell-gate extension already guards this)
+2. shellcheck with this skill's rc (explicit path, nothing to copy):
+   `shellcheck --rcfile <this-skill-dir>/.shellcheckrc script.sh`
+   - portable tier: add `-s dash` — the strictest dialect, catches bashisms
+     (SC2039 class "In POSIX sh, ... is undefined")
+   - host tier on labhost: `-s bash`, or let the shebang deduce
+   - many scripts in one repo: drop the rc at repo root as `.shellcheckrc` —
+     discovered from each script's directory upward, editors inherit it too
 3. Read every unquoted $var aloud; cannot justify it → quote it
 4. If the user is taste-learning: offer an A/B variant (toolbox vs loop) and let them pick
 
-## 5. Canon (consult on demand)
+Inline pragmas work like eslint-disable (`# shellcheck disable=SC2086`) —
+use sparingly, with the reason on the same line.
+
+## 4. Canon (consult on demand)
 
 kn concept `~/kn/bundles/common/expressive-shell.md` · pure-sh-bible
 (dylanaraps) · Wooledge wiki (BashPitfalls, BashFAQ/105) · kiss, `/etc/rc.d/*`

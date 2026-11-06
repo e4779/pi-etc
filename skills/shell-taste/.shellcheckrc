@@ -1,0 +1,16 @@
+# shell-taste: the objective floor for shellcheck (≈ eslint for shell)
+# Usage:   shellcheck --rcfile <skill-dir>/.shellcheckrc script.sh
+# Repo-wide: drop a copy at repo root as .shellcheckrc — shellcheck walks
+#            parent dirs from each script, so nested scripts inherit it.
+# Inline pragmas work like eslint-disable:  # shellcheck disable=SC2086
+
+# report everything down to style level
+severity=style
+
+# warn on unquoted variables even where the value is "safe"
+enable=quote-safe-variables
+
+# uppercase variables must be assigned before use (catches typo'd consts)
+enable=check-unassigned-uppercase
+
+# aggressive option (verified in man): enable=all — every optional check
