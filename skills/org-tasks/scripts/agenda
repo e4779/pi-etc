@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # agenda - org task views: native org via emacs --batch + plain-text shell views.
 # usage: [AGENDA_ROOT=DIR | AGENDA_ROOTS=R1:R2...] agenda <cmd> [args]
-#        agenda -R <cmd>  multi-root, roots from ${AGENDA_ROOTS_FILE:-~/.config/org-agenda/roots}
+#        agenda -R <cmd>    multi-root from ${AGENDA_ROOTS_FILE:-~/.config/org-agenda/roots}
+#        agenda roots ...   manage roots config: list | add DIR | rm DIR | scan [DIR]
+#        (no env and config exists -> multi-root is the DEFAULT; AGENDA_ROOT=DIR pins one repo)
 # cmds:  agenda|todos|list [STATE]|ready|blocked|graph|vocab|lint|id FILE SUBSTRING
 set -euo pipefail
 # resolve symlinks (~/bin/agenda -> skills/org-tasks/scripts/agenda) portably
@@ -13,46 +15,137 @@ while [ -L "$SELF" ]; do
 done
 DIR="$(cd "$(dirname "$SELF")" && pwd)"
 
-# --- root resolution: single repo (default) or multi-root (AGENDA_ROOTS env / -R) ---
-MULTI=0
-ROOTS=()
-CMD="${1:-help}"
-if [ "$CMD" = "-R" ] || [ "$CMD" = "--roots" ]; then
-  shift || true
-  MULTI=1
-  CFG="${AGENDA_ROOTS_FILE:-$HOME/.config/org-agenda/roots}"
-  [ -f "$CFG" ] || { echo "agenda: roots config not found: $CFG" >&2; exit 2; }
+CFG="${AGENDA_ROOTS_FILE:-$HOME/.config/org-agenda/roots}"
+
+expand_root() { # "~" and trailing slashes -> normalized absolute path
+  local r="$1"
+  r="${r/#\~/$HOME}"
+  while [ "$r" != "/" ] && [ "${r%/}" != "$r" ]; do r="${r%/}"; done
+  printf '%s' "$r"
+}
+
+read_roots_cfg() { # populate ROOTS[] from $CFG (comments/blanks skipped)
+  local r
   while IFS= read -r r; do
     [ -z "$r" ] && continue
     case "$r" in '#'*) continue ;; esac
-    ROOTS+=("${r/#\~/$HOME}")
+    ROOTS+=("$(expand_root "$r")")
   done < "$CFG"
+}
+
+cmd_roots() { # agenda roots list|add DIR|rm DIR|scan [DIR] - registry management, no views
+  local sub="${1:-list}"; shift 2>/dev/null || true
+  local r kind
+  case "$sub" in
+    list)
+      if [ ! -f "$CFG" ]; then
+        echo "# no roots config: $CFG"
+        echo "# (agenda then defaults to a single repo: \$PWD or AGENDA_ROOT)"
+        exit 0
+      fi
+      echo "# $CFG"
+      while IFS= read -r r; do
+        [ -z "$r" ] && continue
+        case "$r" in '#'*) echo "$r"; continue ;; esac
+        r="$(expand_root "$r")"
+        kind="MISSING"
+        if [ -d "$r" ]; then
+          kind=dir
+          git -C "$r" rev-parse --is-inside-work-tree >/dev/null 2>&1 && kind=git
+        fi
+        echo "$r  [$kind]"
+      done < "$CFG"
+      ;;
+    add)
+      [ -n "${1:-}" ] || { echo "usage: agenda roots add DIR" >&2; exit 2; }
+      r="$(expand_root "$1")"
+      [ -d "$r" ] || { echo "agenda roots add: not a directory: $r" >&2; exit 2; }
+      if [ -f "$CFG" ] && grep -qxF -- "$r" "$CFG"; then echo "already registered: $r"; exit 0; fi
+      mkdir -p "$(dirname "$CFG")"
+      printf '%s\n' "$r" >> "$CFG"
+      echo "added: $r"
+      ;;
+    rm|remove)
+      [ -n "${1:-}" ] || { echo "usage: agenda roots rm DIR" >&2; exit 2; }
+      r="$(expand_root "$1")"
+      [ -f "$CFG" ] || { echo "agenda roots rm: no config: $CFG" >&2; exit 2; }
+      grep -qxF -- "$r" "$CFG" || { echo "not registered: $r" >&2; exit 4; }
+      local tmp; tmp="$(mktemp)"
+      grep -vxF -- "$r" "$CFG" > "$tmp" || true
+      mv "$tmp" "$CFG"
+      echo "removed: $r"
+      ;;
+    scan) # print candidate dirs (owning *.org outside hidden trees), not yet registered
+      local d="${1:-$HOME}"; d="$(expand_root "$d")"
+      [ -d "$d" ] || { echo "agenda roots scan: not a directory: $d" >&2; exit 2; }
+      local reg="|"
+      if [ -f "$CFG" ]; then
+        while IFS= read -r r; do
+          case "$r" in ''|'#'*) continue ;; esac
+          reg="$reg$(expand_root "$r")|"
+        done < "$CFG"
+      fi
+      find "$d" \( -name '.*' -prune \) -o -type f -name '*.org' -print0 2>/dev/null \
+        | while IFS= read -r -d '' r; do printf '%s\n' "$(dirname "$r")"; done \
+        | sort -u \
+        | while IFS= read -r r; do
+            case "$reg" in *"|$r|"*) continue ;; esac
+            printf '%s\n' "$r"
+          done
+      ;;
+    *)
+      echo "usage: agenda roots list|add DIR|rm DIR|scan [DIR]" >&2; exit 2 ;;
+  esac
+  exit 0
+}
+
+# --- root resolution: multi-root (config is the default) or single repo ---
+MULTI=0
+ROOTS=()
+CMD="${1:-help}"
+if [ "$CMD" = "roots" ]; then
+  shift || true
+  cmd_roots "$@"
+fi
+if [ "$CMD" = "-R" ] || [ "$CMD" = "--roots" ]; then
+  shift || true
+  MULTI=1
+  [ -f "$CFG" ] || { echo "agenda: roots config not found: $CFG" >&2; exit 2; }
+  read_roots_cfg
   CMD="${1:-help}"
 elif [ -n "${AGENDA_ROOTS:-}" ]; then
   MULTI=1
   IFS=':' read -r -a ROOTS <<< "$AGENDA_ROOTS"
+elif [ -z "${AGENDA_ROOT:-}" ] && [ -f "$CFG" ]; then
+  MULTI=1          # whole-agenda default: config exists -> union of all roots
+  read_roots_cfg
 fi
-if [ "$CMD" = "help" ]; then sed -n '2,5p' "$0"; exit 0; fi
+if [ "$CMD" = "help" ]; then sed -n '2,7p' "$0"; exit 0; fi
 shift || true
 
-# --- collect tracked org files as ABSOLUTE paths from every root's git repo ---
+# --- collect org files as ABSOLUTE paths; root = git repo (tracked *.org) or plain dir (recursive, hidden pruned) ---
+declare -A SEEN=()
 FILES=()
+add_file() { local f="$1"; [ -n "${SEEN[$f]:-}" ] && return; SEEN[$f]=1; FILES+=("$f"); }
+collect_root() {
+  local r="$1" f
+  if git -C "$r" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    while IFS= read -r -d '' f; do add_file "$r/$f"; done < <(git -C "$r" ls-files -z '*.org')
+  else
+    [ -d "$r" ] || { echo "agenda: not a directory or git work tree: $r" >&2; exit 2; }
+    while IFS= read -r -d '' f; do add_file "$f"; done < <(find "$r" \( -name '.*' -prune \) -o -type f -name '*.org' -print0)
+  fi
+}
 if [ "$MULTI" -eq 1 ]; then
   if [ "${#ROOTS[@]}" -eq 0 ]; then echo "agenda: empty roots list" >&2; exit 2; fi
-  for r in "${ROOTS[@]}"; do
-    git -C "$r" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
-      || { echo "agenda: not a git work tree: $r" >&2; exit 2; }
-    while IFS= read -r -d '' f; do FILES+=("$r/$f"); done < <(git -C "$r" ls-files -z '*.org')
-  done
-  ROOT="${ROOTS[0]}"
+  for r in "${ROOTS[@]}"; do collect_root "$(expand_root "$r")"; done
+  ROOT="$(expand_root "${ROOTS[0]}")"
 else
-  ROOT="${AGENDA_ROOT:-$PWD}"
-  git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
-    || { echo "agenda: not a git work tree: $ROOT" >&2; exit 2; }
-  while IFS= read -r -d '' f; do FILES+=("$ROOT/$f"); done < <(git -C "$ROOT" ls-files -z '*.org')
+  ROOT="$(expand_root "${AGENDA_ROOT:-$PWD}")"
+  collect_root "$ROOT"
 fi
 if [ "${#FILES[@]}" -eq 0 ]; then
-  echo "agenda: no tracked .org files under ${ROOTS[*]:-$ROOT}" >&2
+  echo "agenda: no .org files under ${ROOTS[*]:-$ROOT}" >&2
   exit 2
 fi
 export AGENDA_ROOT="$ROOT"

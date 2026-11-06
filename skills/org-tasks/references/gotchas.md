@@ -22,6 +22,13 @@ Quoting hell: a --eval one-liner with format strings died with "End of file
 during parsing" on a stray paren. Always put elisp in a file and use
 `emacs --batch -l file.el`. Receipt: agenda demo, first attempt.
 
+## Native views leak fenced headings
+
+`org-todo-list` scans by outline regexp, not the element tree: a `* TODO x`
+inside a `#+begin_src` block DOES appear in `agenda todos` output. The awk
+text views and `agenda id` are fence-aware and refuse such pseudo-headings.
+Receipt: plain-dir root probe, 2026-11-06 (fenced TODO listed by todos).
+
 ## pos/line numbers rot
 
 Byte positions and line numbers drift on every edit above them. colonelpanic8's

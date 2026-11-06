@@ -2,8 +2,13 @@
 # smoke - self-contained fixture matrix for the org-tasks agenda CLI.
 # usage: tests/smoke.sh    (builds its own fixture repo in a temp dir)
 set -uo pipefail
+# hermetic fixtures: under a git hook, GIT_INDEX_FILE/GIT_DIR point at the OUTER
+# repo being committed - fixture repos must not inherit them (verified: suite
+# breaks under a pre-commit hook without this)
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENDA="$HERE/../scripts/agenda"
+export AGENDA_ROOTS_FILE=/dev/null   # hermetic: /dev/null is never -f, machine config cannot leak in
 FIX="$(mktemp -d /tmp/org-smoke.XXXXXX)"
 FIX2=""
 trap 'rm -rf "$FIX" "$FIX2"' EXIT
@@ -137,5 +142,42 @@ if contains 'Submit driver upstream' "$out" && contains 'Прогнать тес
 out=$(xrun id notes.org "Ответ от upstream"); ec=$?
 if [ "$ec" -eq 0 ]; then ok 'roots: id resolves relative file across roots'; else bad "roots: id relative resolution failed (exit=$ec)"; fi
 
+# --- roots v3: config default, plain-dir roots, dedupe, roots management ---
+out=$(AGENDA_ROOTS_FILE="$CFG2" timeout 30 "$AGENDA" todos 2>/dev/null)
+if contains 'Submit driver upstream' "$out" && contains 'Написать драйвер помпы' "$out"; then ok 'roots: config is the default (no -R/env)'; else bad 'roots: default multi-root failed'; fi
+out=$(AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" todos 2>/dev/null)
+if contains 'Написать драйвер помпы' "$out" && ! contains 'Submit driver upstream' "$out"; then ok 'roots: AGENDA_ROOT pins one repo'; else bad 'roots: AGENDA_ROOT override broken'; fi
+
+FIX3="$(mktemp -d /tmp/org-smoke3.XXXXXX)"
+cat > "$FIX3/plain.org" <<'EOF'
+#+TODO: TODO NEXT WAITING SOMEDAY | DONE CANCELLED
+* TODO Plain dir without git
+#+begin_src org
+* TODO fenced out
+#+end_src
+EOF
+mkdir -p "$FIX3/.hidden" && printf '* TODO hidden tree\n' > "$FIX3/.hidden/h.org"
+out=$(AGENDA_ROOTS="$FIX3" timeout 30 "$AGENDA" todos 2>/dev/null)
+if contains 'Plain dir without git' "$out" && ! contains 'hidden tree' "$out"; then ok 'roots: plain dir root scanned, hidden pruned'; else bad 'roots: plain dir root failed'; fi
+
+out=$(AGENDA_ROOTS="$FIX:$FIX" timeout 30 "$AGENDA" list TODO 2>/dev/null)
+n=$(printf '%s\n' "$out" | grep -c 'Написать драйвер')
+if [ "$n" -eq 1 ]; then ok 'roots: duplicate roots deduped'; else bad "roots: dup roots listed task $n times"; fi
+
+RCFG="$FIX/roots.cfg"
+out=$(AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots list 2>/dev/null)
+if contains '# no roots config' "$out"; then ok 'roots: list on missing config'; else bad 'roots: list missing-config failed'; fi
+AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots add "$FIX2" >/dev/null 2>&1 && ok 'roots: add registers dir' || bad 'roots: add failed'
+out=$(AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots add "$FIX2" 2>/dev/null)
+if contains 'already registered' "$out"; then ok 'roots: add is idempotent'; else bad 'roots: add dup not detected'; fi
+AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots add /nonexistent-dir-xyz >/dev/null 2>&1; ec=$?
+if [ "$ec" -eq 2 ]; then ok 'roots: add rejects missing dir'; else bad "roots: add missing-dir exit=$ec"; fi
+out=$(AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots list 2>/dev/null)
+if contains "$FIX2  [git]" "$out"; then ok 'roots: list shows annotated entry'; else bad 'roots: list lost entry'; fi
+AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots rm "$FIX2" >/dev/null 2>&1 && ok 'roots: rm removes' || bad 'roots: rm failed'
+AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots rm "$FIX2" >/dev/null 2>&1; ec=$?
+if [ "$ec" -eq 4 ]; then ok 'roots: rm unknown exits 4'; else bad "roots: rm unknown exit=$ec"; fi
+out=$(AGENDA_ROOTS_FILE="$RCFG" timeout 30 "$AGENDA" roots scan "$FIX" 2>/dev/null)
+if contains "$FIX" "$out"; then ok 'roots: scan finds candidates'; else bad 'roots: scan empty'; fi
 printf '\n%d checks, %d failures\n' "$RUNS" "$FAILS"
 [ "$FAILS" -eq 0 ]

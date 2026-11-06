@@ -50,10 +50,11 @@ store it.
 
 ## Discovery
 
-`git ls-files '*.org'` from the repo root. Repositories are the curation
-unit; every tracked org file participates. Never create standalone TODO.org or
-task-list files - migrate legacy ones instead
-(references/playbook-todo-md.md).
+Per root: git repositories contribute `git ls-files '*.org'` (tracked files
+only); plain directories contribute every `*.org` found recursively outside
+hidden trees. Roots are registered in `~/.config/org-agenda/roots`
+(`agenda roots add DIR`). Never create standalone TODO.org or task-list
+files - migrate legacy ones instead (references/playbook-todo-md.md).
 
 ## CLI
 
@@ -69,12 +70,17 @@ over the plain files. Run from the repo root (or set AGENDA_ROOT):
     agenda graph                  # dependency graph as DOT
     agenda id FILE SUBSTRING      # stamp :ID: on a heading, print it
     agenda lint                   # vocab, drawer placement, dangling blockers
+    agenda roots list|add|rm|scan # manage ~/.config/org-agenda/roots
 
-Cross-repo views: `AGENDA_ROOTS=repo1:repo2 agenda <cmd>` or `agenda -R`
-(roots from `~/.config/org-agenda/roots`, one per line, `#` comments; override
-with AGENDA_ROOTS_FILE). Files are unioned across roots as absolute paths;
-id-blockers resolve across repos; `agenda id` with a relative FILE requires
-it to exist in exactly one root.
+Whole-agenda default: when `~/.config/org-agenda/roots` exists (one root per
+line, `#` comments), every command unions ALL roots without any flags - git
+repos contribute tracked org files, plain directories every `*.org` outside
+hidden trees. Override: `AGENDA_ROOT=DIR` pins one repo, `AGENDA_ROOTS=R1:R2`
+and `agenda -R` select roots explicitly, AGENDA_ROOTS_FILE moves the config.
+Registry management: `agenda roots list|add|rm|scan [DIR]` (scan prints
+candidate dirs). Files are unioned and deduped as absolute paths; id-blockers
+resolve across roots; `agenda id` with a relative FILE requires it to exist
+in exactly one root.
 
 Views are reactive: nothing is cached, every call re-reads the files.
 The only persistent cache is org-id-locations.
