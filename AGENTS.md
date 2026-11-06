@@ -51,7 +51,16 @@ wired into pre-commit via `tools/install-hooks.mjs`.
 npm install          # installs deps + pre-commit hook
 npx tsc --noEmit     # type-check
 npm run lint:skills  # validate all SKILL.md frontmatter
+npm run gate         # staged quality gate (runs in pre-commit)
 ```
+
+### Quality gate (pre-commit)
+
+The hook (installed by `tools/install-hooks.mjs`) runs `tools/gate.sh` over
+staged files: `awk -f` / `awk -safe` parse+security lint for .awk, `bash -n`
+for .sh, `tools/elisp-check` for .el, and the org-tasks smoke suite whenever
+that skill changes. Deterministic checks only - style judgment stays out of
+the hook by design.
 
 ### Elisp
 
