@@ -70,6 +70,12 @@ over the plain files. Run from the repo root (or set AGENDA_ROOT):
     agenda id FILE SUBSTRING      # stamp :ID: on a heading, print it
     agenda lint                   # vocab, drawer placement, dangling blockers
 
+Cross-repo views: `AGENDA_ROOTS=repo1:repo2 agenda <cmd>` or `agenda -R`
+(roots from `~/.config/org-agenda/roots`, one per line, `#` comments; override
+with AGENDA_ROOTS_FILE). Files are unioned across roots as absolute paths;
+id-blockers resolve across repos; `agenda id` with a relative FILE requires
+it to exist in exactly one root.
+
 Views are reactive: nothing is cached, every call re-reads the files.
 The only persistent cache is org-id-locations.
 

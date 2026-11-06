@@ -5,7 +5,8 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENDA="$HERE/../scripts/agenda"
 FIX="$(mktemp -d /tmp/org-smoke.XXXXXX)"
-trap 'rm -rf "$FIX"' EXIT
+FIX2=""
+trap 'rm -rf "$FIX" "$FIX2"' EXIT
 RUNS=0; FAILS=0
 ok()  { RUNS=$((RUNS+1)); printf 'ok   %s\n' "$1"; }
 bad() { FAILS=$((FAILS+1)); printf 'FAIL %s\n' "$1"; }
@@ -107,6 +108,34 @@ out=$(AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" id notes.org "фейковый х�
 if [ "$ec" -eq 4 ]; then ok 'id: in-block pseudo-heading refused'; else bad "id: pseudo-heading not refused (exit=$ec)"; fi
 out=$(AGENDA_ROOT="$FIX" timeout 30 "$AGENDA" id notes.org "Migrate backup" 2>/dev/null); ec=$?
 if [ "$ec" -eq 0 ] && grep -q ':ID:' "$FIX/notes.org"; then ok 'id: real heading stamped'; else bad "id: real heading not stamped (exit=$ec)"; fi
+
+
+# --- multi-root: AGENDA_ROOTS / -R cross-repo views ---
+FIX2="$(mktemp -d /tmp/org-smoke2.XXXXXX)"
+cat > "$FIX2/driver.org" <<'EOF'
+#+TODO: TODO NEXT WAITING SOMEDAY | DONE CANCELLED
+* NEXT Submit driver upstream
+  :PROPERTIES:
+  :BLOCKER: id:pump-driver-2026
+  :END:
+* SOMEDAY S3 resume reinit
+EOF
+cd "$FIX2" && git init -q && git add -A && git -c user.email=a@b -c user.name=t commit -qm fixtures2
+xrun() { AGENDA_ROOTS="$FIX:$FIX2" timeout 30 "$AGENDA" "$@" 2>/dev/null; }
+
+out=$(xrun todos)
+if contains 'Submit driver upstream' "$out" && contains 'Написать драйвер помпы' "$out"; then ok 'roots: todos spans both repos'; else bad 'roots: todos missing a repo'; fi
+out=$(xrun blocked)
+if contains 'Submit driver upstream' "$out" && contains 'pump-driver-2026' "$out"; then ok 'roots: cross-repo blocker resolved against other repo'; else bad 'roots: cross-repo blocker lost'; fi
+out=$(xrun graph)
+if echo "$out" | grep -q 'unresolved id:pump-driver-2026'; then bad 'roots: graph dashed unresolved for known cross-repo id'; else ok 'roots: graph solid cross-repo edge'; fi
+out=$(xrun ready)
+if ! contains 'Submit driver upstream' "$out" && contains 'Рестарт bcachefsbox' "$out"; then ok 'roots: ready filters by cross-repo blocker'; else bad 'roots: ready wrong in multi-root'; fi
+CFG2="$FIX2/roots.cfg"; printf '%s\n\n# comment\n%s\n' "$FIX" "$FIX2" > "$CFG2"
+out=$(AGENDA_ROOTS_FILE="$CFG2" timeout 30 "$AGENDA" -R todos 2>/dev/null)
+if contains 'Submit driver upstream' "$out" && contains 'Прогнать тесты на стенде' "$out"; then ok 'roots: -R reads config (comments/blanks skipped)'; else bad 'roots: -R config failed'; fi
+out=$(xrun id notes.org "Ответ от upstream"); ec=$?
+if [ "$ec" -eq 0 ]; then ok 'roots: id resolves relative file across roots'; else bad "roots: id relative resolution failed (exit=$ec)"; fi
 
 printf '\n%d checks, %d failures\n' "$RUNS" "$FAILS"
 [ "$FAILS" -eq 0 ]

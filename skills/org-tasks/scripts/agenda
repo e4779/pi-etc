@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # agenda - org task views: native org via emacs --batch + plain-text shell views.
-# usage: [AGENDA_ROOT=DIR] agenda <agenda|todos|list|ready|blocked|graph|vocab|lint|id> [args]
+# usage: [AGENDA_ROOT=DIR | AGENDA_ROOTS=R1:R2...] agenda <cmd> [args]
+#        agenda -R <cmd>  multi-root, roots from ${AGENDA_ROOTS_FILE:-~/.config/org-agenda/roots}
+# cmds:  agenda|todos|list [STATE]|ready|blocked|graph|vocab|lint|id FILE SUBSTRING
 set -euo pipefail
 # resolve symlinks (~/bin/agenda -> skills/org-tasks/scripts/agenda) portably
 SELF="${BASH_SOURCE[0]}"
@@ -10,13 +12,47 @@ while [ -L "$SELF" ]; do
   case "$SELF" in /*) ;; *) SELF="$LDIR/$SELF" ;; esac
 done
 DIR="$(cd "$(dirname "$SELF")" && pwd)"
-ROOT="${AGENDA_ROOT:-$PWD}"
+
+# --- root resolution: single repo (default) or multi-root (AGENDA_ROOTS env / -R) ---
+MULTI=0
+ROOTS=()
 CMD="${1:-help}"
-if [ "$CMD" = "help" ]; then sed -n '2,3p' "$0"; exit 0; fi
+if [ "$CMD" = "-R" ] || [ "$CMD" = "--roots" ]; then
+  shift || true
+  MULTI=1
+  CFG="${AGENDA_ROOTS_FILE:-$HOME/.config/org-agenda/roots}"
+  [ -f "$CFG" ] || { echo "agenda: roots config not found: $CFG" >&2; exit 2; }
+  while IFS= read -r r; do
+    [ -z "$r" ] && continue
+    case "$r" in '#'*) continue ;; esac
+    ROOTS+=("${r/#\~/$HOME}")
+  done < "$CFG"
+  CMD="${1:-help}"
+elif [ -n "${AGENDA_ROOTS:-}" ]; then
+  MULTI=1
+  IFS=':' read -r -a ROOTS <<< "$AGENDA_ROOTS"
+fi
+if [ "$CMD" = "help" ]; then sed -n '2,5p' "$0"; exit 0; fi
 shift || true
-mapfile -d '' -t FILES < <(git -C "$ROOT" ls-files -z '*.org')
+
+# --- collect tracked org files as ABSOLUTE paths from every root's git repo ---
+FILES=()
+if [ "$MULTI" -eq 1 ]; then
+  if [ "${#ROOTS[@]}" -eq 0 ]; then echo "agenda: empty roots list" >&2; exit 2; fi
+  for r in "${ROOTS[@]}"; do
+    git -C "$r" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+      || { echo "agenda: not a git work tree: $r" >&2; exit 2; }
+    while IFS= read -r -d '' f; do FILES+=("$r/$f"); done < <(git -C "$r" ls-files -z '*.org')
+  done
+  ROOT="${ROOTS[0]}"
+else
+  ROOT="${AGENDA_ROOT:-$PWD}"
+  git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || { echo "agenda: not a git work tree: $ROOT" >&2; exit 2; }
+  while IFS= read -r -d '' f; do FILES+=("$ROOT/$f"); done < <(git -C "$ROOT" ls-files -z '*.org')
+fi
 if [ "${#FILES[@]}" -eq 0 ]; then
-  echo "agenda: no tracked .org files under $ROOT" >&2
+  echo "agenda: no tracked .org files under ${ROOTS[*]:-$ROOT}" >&2
   exit 2
 fi
 export AGENDA_ROOT="$ROOT"
@@ -30,7 +66,23 @@ case "$CMD" in
     if [ -z "$FILE" ] || [ -z "$SUB" ]; then
       echo "usage: agenda id FILE SUBSTRING" >&2; exit 2
     fi
-    HITS=$(awk -v mode="find" -v fsub="$SUB" -f "$DIR/views.awk" "$ROOT/$FILE" || true)
+    PATH_FILE="$FILE"
+    if [ "$MULTI" -eq 1 ]; then
+      case "$FILE" in
+        /*) ;;
+        *)
+          hits=0
+          for r in "${ROOTS[@]}"; do
+            if [ -f "$r/$FILE" ]; then PATH_FILE="$r/$FILE"; hits=$((hits+1)); fi
+          done
+          if [ "$hits" -ne 1 ]; then
+            echo "refuse: $hits roots contain '$FILE'" >&2; exit 4
+          fi ;;
+      esac
+    else
+      PATH_FILE="$ROOT/$FILE"
+    fi
+    HITS=$(awk -v mode="find" -v fsub="$SUB" -f "$DIR/views.awk" "$PATH_FILE" || true)
     N=$(printf '%s\n' "$HITS" | grep -c . || true)
     if [ "$N" -ne 1 ]; then
       echo "refuse: $N candidate headings for '$SUB'" >&2
@@ -38,7 +90,7 @@ case "$CMD" in
     fi
     LINE=$(printf '%s\n' "$HITS" | cut -d: -f1)
     FULL=$(printf '%s\n' "$HITS" | cut -d: -f2-)
-    exec emacs --batch -l "$DIR/agenda.el" -- stamp "$FILE" "$LINE" "$FULL" ;;
+    exec emacs --batch -l "$DIR/agenda.el" -- stamp "$PATH_FILE" "$LINE" "$FULL" ;;
   list)
     STATE="${1:-}"
     if [ -n "$STATE" ]; then
@@ -48,19 +100,19 @@ case "$CMD" in
     fi
     rc=0
     for f in "${FILES[@]}"; do
-      rg -n "$PAT" "$ROOT/$f" || { s=$?; [ "$s" -eq 1 ] || rc="$s"; }
+      rg -n "$PAT" "$f" || { s=$?; [ "$s" -eq 1 ] || rc="$s"; }
     done
     exit "$rc" ;;
   vocab)
-    exec awk -v mode="vocab" -f "$DIR/views.awk" "${FILES[@]/#/$ROOT/}" ;;
+    exec awk -v mode="vocab" -f "$DIR/views.awk" "${FILES[@]}" ;;
   lint)
     rc=0
     for f in "${FILES[@]}"; do
-      if [ ! -s "$ROOT/$f" ]; then echo "$ROOT/$f:1: empty file"; rc=1; fi
+      if [ ! -s "$f" ]; then echo "$f:1: empty file"; rc=1; fi
     done
-    exec awk -v mode="lint" -f "$DIR/views.awk" "${FILES[@]/#/$ROOT/}" ;;
+    exec awk -v mode="lint" -f "$DIR/views.awk" "${FILES[@]}" ;;
   ready|blocked|graph)
-    exec awk -v mode="$CMD" -f "$DIR/views.awk" "${FILES[@]/#/$ROOT/}" ;;
+    exec awk -v mode="$CMD" -f "$DIR/views.awk" "${FILES[@]}" ;;
   *)
     echo "unknown command: $CMD" >&2
     exit 2 ;;
