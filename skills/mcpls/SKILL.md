@@ -241,6 +241,8 @@ After editing a file:
 | Slow first response, fast subsequent | Normal cold start / indexing. Pre-warm with a dummy `get_document_symbols`. |
 | `rename_symbol` misses some references | Symbol is in macro expansion or generated code. Verify with `get_references` first. |
 | mcporter: `"retirement is unverified"` | Keep-alive patch (openclaw/mcporter#499) missing. Use the `~/bin/mcpls-call` wrapper. |
+| Call hierarchy / code actions return an error or `isError` on TS | typescript-language-server does not support them. Check `get_tool_support` before relying on a capability for a given language. |
+| Completions return `[]` | Cursor position must be inside the document (line beyond end → empty). |
 
 ## When you need more
 
