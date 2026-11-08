@@ -239,6 +239,8 @@ After editing a file:
 | `"Position out of bounds"` | Verify the line exists. Positions are 1-based — not 0-based LSP. |
 | Rust: symbols/diagnostics fine, hover/definition/references empty | `workspace.roots` has only umbrella directories — none is a cargo root, so rust-analyzer treats files as detached. Add the project root (dir with `Cargo.toml`) to `roots` and restart. TS tolerates umbrellas (tsserver finds nested tsconfig); Rust does not. |
 | Slow first response, fast subsequent | Normal cold start / indexing. Pre-warm with a dummy `get_document_symbols`. |
+| rename/references cover one file only; definition from a usage lands on the import line | Cold project graph: answers are valid but **local-only** and look correct. Warm the project (any call + a few seconds; a `get_references` before `rename_symbol`), then retry. A large project sharing the pooled session delays warming of others. |
+| Applying rename/format edits by hand | Result positions are 1-based (mcpls normalizes). Use `~/bin/mcpls-apply` — accepts `{changes}`, a bare changes array, or `{edits}`. |
 | `rename_symbol` misses some references | Symbol is in macro expansion or generated code. Verify with `get_references` first. |
 | mcporter: `"retirement is unverified"` | Keep-alive patch (openclaw/mcporter#499) missing. Use the `~/bin/mcpls-call` wrapper. |
 | Call hierarchy / code actions return an error or `isError` on TS | typescript-language-server does not support them. Check `get_tool_support` before relying on a capability for a given language. |
