@@ -237,6 +237,7 @@ After editing a file:
 | `get_diagnostics` returns stale errors | Save the file to disk first. Diagnostics reflect disk state. |
 | `"server is still initializing"` | Large project loading. Wait and retry; raise `timeout_seconds` in config. |
 | `"Position out of bounds"` | Verify the line exists. Positions are 1-based — not 0-based LSP. |
+| Rust: symbols/diagnostics fine, hover/definition/references empty | `workspace.roots` has only umbrella directories — none is a cargo root, so rust-analyzer treats files as detached. Add the project root (dir with `Cargo.toml`) to `roots` and restart. TS tolerates umbrellas (tsserver finds nested tsconfig); Rust does not. |
 | Slow first response, fast subsequent | Normal cold start / indexing. Pre-warm with a dummy `get_document_symbols`. |
 | `rename_symbol` misses some references | Symbol is in macro expansion or generated code. Verify with `get_references` first. |
 | mcporter: `"retirement is unverified"` | Keep-alive patch (openclaw/mcporter#499) missing. Use the `~/bin/mcpls-call` wrapper. |
