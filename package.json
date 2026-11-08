@@ -9,7 +9,7 @@
   ],
   "type": "module",
   "scripts": {
-    "lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done",
+    "lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done && sh scripts/lint-skills-data.sh",
     "gate": "sh tools/gate.sh",
     "postinstall": "node tools/install-hooks.mjs"
   },

@@ -1,6 +1,6 @@
 ---
 name: shell-taste
-description: "Taste layer for shell code: portable POSIX idioms vs host-shell extras, composability discipline, pre-delivery ritual. Use when writing, reviewing, or refactoring any #!/bin/sh or bash script, rc.d-style service scripts, CLI glue. RU: написать шелл-скрипт, идиоматичный sh, красивый шелл, переписать скрипт на sh."
+description: "Taste layer for shell code: portable POSIX idioms vs host-shell extras, composability discipline, pre-delivery ritual — plus a generated handbook of measured idioms from ~900 real-world open-source scripts (error handling and die, check_root, usage output, cleanup traps, install logic, menus, logging) with ecosystem-consensus counts and canon exemplars. Use when writing, reviewing, or refactoring any #!/bin/sh or bash script, rc.d-style service script, or CLI glue; when asked how real-world scripts or the ecosystem handle a task, or which idiom is common vs one-off. RU: написать шелл-скрипт, идиоматичный sh, красивый шелл, переписать скрипт на sh, как принято в опенсорсных скриптах, как это делают реальные скрипты, обработка ошибок, check_root, usage, cleanup, install."
 ---
 
 # shell-taste
@@ -70,3 +70,27 @@ use sparingly, with the reason on the same line.
 kn concept `~/kn/bundles/common/expressive-shell.md` · pure-sh-bible
 (dylanaraps) · Wooledge wiki (BashPitfalls, BashFAQ/105) · kiss, `/etc/rc.d/*`
 on this host.
+
+## 5. Handbook (generated)
+
+Measured companion: idioms harvested from ~900 real-world open-source
+scripts (die/error handling, check_root, usage output, cleanup traps,
+install logic, menus, logging), with ecosystem-consensus counts and canon
+exemplars. Rebuild after atlas data changes: `mk -C ~/projects/shell-atlas handbook`.
+
+| You ask | Open | You get |
+|---|---|---|
+| error handling, die, exit codes | references/handbook/dom/02-errors-exit.md | family entries + copy-paste queries |
+| how do real-world scripts do X / what does the ecosystem use | domain page via the slug line below | consensus counts + canon kin |
+| the proper way / show the reference | domain page, canon line | top-ranked exemplar body |
+| how common is this practice | domain page, consensus lines; thresholds in references/handbook/index.md | wild family names + similarity scores |
+| two live variants of one task | references/handbook/dialects.md | JOB/SAME/DIFF card, bodies a/b |
+| what is family X / where does check_root appear | references/handbook/family-index.md | anchor → domain page → query |
+
+Domains: `output-logging` `errors-exit` `installation-setup` `network` `files-paths` `checks-validation` `system-administration` `privilege-users` `text-data` `terminal-ux` `process-control` `containers` `agents-ai-tooling` `uncategorized` — one page per domain at `references/handbook/dom/<NN>-<slug>.md`.
+
+Reading rules: counts printed on the pages are navigation aids, stamped
+as-of — never quote them as universal facts. Canon and wild family names
+differ ("Check Root Privileges" vs "Privilege Check"): grep family-index
+by word root and desc words, not by exact name.
+
