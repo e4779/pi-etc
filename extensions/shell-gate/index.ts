@@ -10,10 +10,10 @@
  * Layers (fail-open everywhere — a broken gate never wedges the agent):
  *   1. bash --norc -n parse check. Always available; catches unbalanced
  *      quotes, broken heredocs, parse errors ("unexpected EOF" class).
- *   2. ShellCheck semantics via shellcheck-wasm (an npm dependency of
- *      pi-etc, executed by the bun runtime pi already uses). No host
- *      binary needed — FreeBSD pkg does not ship shellcheck. Catches
- *      word splitting, unquoted variables, rm -rf on empty variables.
+ *   2. ShellCheck semantics: host `shellcheck` binary first (labhost ships
+ *      0.11.0 at /usr/local/bin), shellcheck-wasm (npm dep of pi-etc) as
+ *      the fallback for machines without the binary. Catches word
+ *      splitting, unquoted variables, rm -rf on empty variables.
  *
  * Blocked calls return { block: true, reason }. Escape hatch: prepend a
  * "# shellcheck disable=SCxxxx" directive line (a plain bash comment,
@@ -155,6 +155,62 @@ function warnOnce(msg: string): void {
   wasmWarned = true;
 }
 
+/**
+ * Host `shellcheck` binary — preferred engine (full version, no wasm init).
+ * Returns issues (possibly empty), or undefined when no usable binary —
+ * the caller falls back to the wasm engine. Fail-open on any error.
+ */
+let hostAvailable: boolean | null = null;
+
+function hostBinaryIssues(
+  script: string,
+  cfg: ShellGateConfig,
+  opts?: { command?: boolean },
+): Issue[] | undefined {
+  if (hostAvailable === null) {
+    let v: ReturnType<typeof spawnSync>;
+    try {
+      v = spawnSync("shellcheck", ["--version"], { timeout: 5000, encoding: "utf8" });
+    } catch {
+      v = { error: new Error("spawn failed") } as ReturnType<typeof spawnSync>;
+    }
+    hostAvailable = !v.error && v.status === 0;
+  }
+  if (!hostAvailable) return undefined;
+  const floor = SEVERITY_RANK[cfg.minSeverity ?? "info"] ?? SEVERITY_RANK.info;
+  const base = cfg.suppressedCodes ?? DEFAULT_SUPPRESSED;
+  const cmdExtra = opts?.command ? (cfg.commandSuppressedCodes ?? DEFAULT_CMD_SUPPRESSED) : [];
+  const suppressed = new Set([...base, ...cmdExtra].map((c) => c.replace(/^SC/, "")));
+  let r: ReturnType<typeof spawnSync>;
+  try {
+    // "-" reads the script from stdin; exit 0 = clean, 1 = issues found.
+    r = spawnSync("shellcheck", ["-f", "json", "-s", detectDialect(script), "-"], {
+      input: script,
+      timeout: 10000,
+      encoding: "utf8",
+    });
+  } catch {
+    return undefined;
+  }
+  if (r.error || (r.status !== 0 && r.status !== 1)) return undefined;
+  let parsed: Array<{ line?: number; column?: number; level?: string; code?: number; message?: string }>;
+  try {
+    parsed = JSON.parse(r.stdout || "[]");
+  } catch {
+    return undefined;
+  }
+  const issues: Issue[] = (parsed ?? []).map((i) => ({
+    severity: i.level ?? "style",
+    line: i.line ?? 0,
+    col: i.column ?? 0,
+    message: i.message ?? "",
+    code: "SC" + String(i.code ?? 0),
+  }));
+  return issues.filter(
+    (i) => (SEVERITY_RANK[i.severity] ?? 0) >= floor && !suppressed.has(i.code.replace(/^SC/, "")),
+  );
+}
+
 async function getWasm(): Promise<WasmInstance | null> {
   patchConsole();
   if (!wasmInit) {
@@ -188,12 +244,14 @@ function toIssues(results: LintResult[]): Issue[] {
   }));
 }
 
-/** Returns issues, or null when the semantic layer is unavailable (fail-open). */
+/** Returns issues, or null when no engine is available (fail-open). */
 export async function shellCheckIssues(
   script: string,
   cfg: ShellGateConfig,
   opts?: { command?: boolean },
 ): Promise<Issue[] | null> {
+  const host = hostBinaryIssues(script, cfg, opts);
+  if (host !== undefined) return host;
   const inst = await getWasm();
   if (!inst) return null;
   const floor = SEVERITY_RANK[cfg.minSeverity ?? "info"] ?? SEVERITY_RANK.info;

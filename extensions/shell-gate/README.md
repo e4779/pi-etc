@@ -14,9 +14,10 @@ is one turn, with SC codes in hand.
 1. `bash --norc -n` — parse check, always available: unbalanced quotes,
    broken heredocs, parse errors. The "unexpected EOF" class.
 2. ShellCheck — semantic layer (word splitting, quoting, `rm -rf` on empty
-   variables) via `shellcheck-wasm`, executed inside the pi bun runtime.
-   No host binary needed: FreeBSD pkg does not package shellcheck. Skips
-   silently when the wasm module cannot load.
+   variables). Host `shellcheck` binary first (labhost: 0.11.0 at
+   /usr/local/bin); `shellcheck-wasm` (npm dep of pi-etc) as the fallback
+   for machines without the binary, executed inside the pi bun runtime.
+   Skips silently when no engine is available.
 
 Both layers fail open: any internal error passes the command through.
 
