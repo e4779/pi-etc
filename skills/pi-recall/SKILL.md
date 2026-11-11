@@ -1,23 +1,54 @@
 ---
 name: pi-recall
-description: Cross-session memory over raw pi session transcripts — BM25-ranked recall, full-entry expand, session catalog — via the pi-recall CLI. Use before domain work on a known topic (past decisions, prior failures, "did we already try X", what other sessions concluded). Never for facts derivable from the repo or git history — read those directly.
+description: Cross-session memory over raw pi session transcripts — BM25-ranked recall, full-entry expand, session catalog — via the pi-recall CLI (park output to a file, then grep/slice — no context guard needed). Use before domain work on a known topic (past decisions, prior failures, "did we already try X", what other sessions concluded). Never for facts derivable from the repo or git history — read those directly.
 ---
 
 # pi-recall — cross-session memory
 
-## Two-step idiom — always this shape
+## Primary door: CLI, park-then-slice
 
-    pi-recall recall 'contour guard vitest' --scope global --limit 5
-    pi-recall expand id=<8-hex id from the chosen hit>
+Recall output is plain text. Park it in a file and work it with ordinary
+shell reflexes — grep to navigate, sed/head to read slices. The file is the
+offload; no context guard, no digest discipline. Re-grep when the question
+changes; the bytes stay on disk.
 
-recall = navigation (ranked hits, each carrying id=); expand = reading
-(lossless full entry — long texts page via the textOffset hint it prints).
-Never grep session JSONL by hand — expand is the sanctioned full read.
+    pi-recall recall 'pi-durable chord WP8' --scope global --limit 20 > /tmp/r.md
+    grep -E '^\[' /tmp/r.md | head            # ranked hits: id=, score, snippet
+    sed -n '12,40p' /tmp/r.md                 # read any slice on demand
+
+## Two-step idiom: recall navigates, expand reads
+
+    pi-recall recall 'contour guard vitest' --scope global --limit 5 > /tmp/r.md
+    pi-recall expand id=<8-hex id from a hit> > /tmp/e.md
+    wc -c /tmp/e.md; sed -n '1,60p' /tmp/e.md  # long entries — read in chunks
+
+expand is the sanctioned full read (lossless; long texts page via the
+textOffset hint it prints). Never grep session JSONL by hand.
+
+## Recipe 1 — topic dig before domain work
+
+    pi-recall recall 'shell-lab fabric-exec выкорчёвывание' --scope global --limit 20 > /tmp/r.md
+    grep -E '^\[' /tmp/r.md | head            # pick hits by score + snippet
+    pi-recall expand id=<hex> > /tmp/e.md     # full entries for the chosen ones
+
+## Recipe 2 — read a known long entry in chunks
+
+    pi-recall expand session=<path|sid> idx=146 maxChars=20000 > /tmp/e.md
+    wc -c /tmp/e.md                           # total size, then slice:
+    sed -n '1,80p' /tmp/e.md                  # head, continue with next ranges
+
+## Other doors
+
+- Native tools `memory_recall` / `memory_expand` / `memory_sessions` —
+  declared direct since @e4779/pi-recall 0.2.0 (also callable from codemode
+  as `tools.memory_recall({...})`). Use inline when ranked hits are enough
+  and no file workflow is needed; the CLI above always works regardless.
+- Multi-machine: `pi-memory-sync.sh` rsyncs session stores between machines;
+  the engine's portable sources / fs adapters index other machines' archives.
 
 ## Scope intuition
 
-- global — default for recall; run it before domain work on a known topic
-  ("what did we already decide about X", prior failures, past tooling).
+- global — default for recall; run it before domain work on a known topic.
 - project — this repo's chronology; session — own lineage (sessions default).
 - `--branches all` — also abandoned off-lineage tree siblings.
 
@@ -27,18 +58,6 @@ Default matches any term (OR); `--phrase` = adjacency, `--regex` = pattern,
 `--all` = every term in one entry. Cold sessions cannot prove adjacency —
 probe a cold session with one rare literal term first. Page with
 `--limit`/`--offset` (the output names the next offset).
-
-## Both doors
-
-The package also registers deferred tools `memory_recall` / `memory_expand`
-/ `memory_sessions`. On this contour (labhost, pbus bus) also:
-`pbus call memory_recall '{"query":"..."}'` — the CLI above always works
-regardless.
-
-## Hygiene
-
-Raw recall/expand output over ~4KB → write to a file, keep a ≤1KB digest in
-context (id + one-line gist per hit).
 
 ## Liveness and trust
 
