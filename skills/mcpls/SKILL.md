@@ -8,8 +8,10 @@ description: >
   you need WHERE a symbol is defined, WHAT type it is, WHO calls or uses a
   function, or WHAT diagnostics exist, in Rust, TypeScript, Python, Go,
   C/C++, Zig projects. Don't use for plain text search (use rg) or
-  structural pattern replace (use ast-grep). Call via `mcp.mcpls.*` in
-  fabric_exec or `mcporter call mcpls.<tool>` in the shell contour.
+  structural pattern replace (use ast-grep). Call from sh blocks via
+  `mcporter call mcpls.<tool>` or the `~/bin/mcpls-*` wrappers (primary,
+  vanilla pi contour — MCP is not configured inside pi); legacy fabric
+  fallback: `mcp.mcpls.*` inside fabric_exec.
   RU: где определена функция, найди определение, кто вызывает, кто
   использует, найди референсы, тип символа, диагностика, безопасный rename,
   пустой результат rust-analyzer. Errors: path outside workspace,
@@ -20,7 +22,9 @@ description: >
 
 Compiler-accurate code understanding via the Language Server Protocol — type
 inference, cross-references, semantic navigation, diagnostics.
-Two call contours: Fabric and shell.
+Two call contours: shell (primary) and Fabric (legacy fallback). On this
+machine pi runs the vanilla contour — bare prose + sh blocks, zero model
+tools — so MCP is not configured inside pi: mcpls is reached from shell.
 
 ## When to use
 
@@ -84,20 +88,7 @@ Key rule: a project-local `mcpls.toml` is ignored unless trusted; enabling
 
 ## How to call — two contours
 
-### Fabric: `mcp.mcpls.*` inside `fabric_exec`
-
-Register once per session (cwd = project root), then call tools:
-
-```ts
-await mcp.$register({
-  name: "mcpls",
-  command: "mcpls",
-  cwd: process.cwd(),
-});
-await mcp.mcpls.get_server_logs({}); // smoke test
-```
-
-### Shell: `mcporter call`
+### Shell (primary): `mcporter call` from sh blocks
 
 ```bash
 mcporter call mcpls.get_hover file_path=src/lib.rs line=42 character=8
@@ -119,20 +110,35 @@ Fallbacks if the pooled path is unavailable:
 ~/bin/mcpls-ensure && mcporter call mcpls.get_diagnostics file_path=src/lib.rs
 ```
 
+### Fabric (legacy fallback): `mcp.mcpls.*` inside `fabric_exec`
+
+Only on the legacy fabric contour (in-guest MCP tool calls), while it still
+exists. Register once per session (cwd = project root), then call tools:
+
+```ts
+await mcp.$register({
+  name: "mcpls",
+  command: "mcpls",
+  cwd: process.cwd(),
+});
+await mcp.mcpls.get_server_logs({}); // smoke test
+```
+
 ## Core workflow
 
 Three rules:
 
-1. **Register / launch with cwd = project root** — mcpls auto-detects workspace
-   markers from there.
+1. **Launch with cwd = project root** — `mcporter call` and the wrappers
+   inherit the sh block's cwd; run them from the project root so mcpls
+   auto-detects workspace markers. (Fabric: pass `cwd` to `mcp.$register`.)
 2. **File paths must be relative** to project root. Absolute paths cause
    `"path outside workspace"`; if a relative path still fails, check
    `[workspace] roots` in `mcpls.toml` — the file must sit under a root.
 3. **Positions are 1-based** — line 1, character 1 = first character. Line
    numbers from reads work as-is (mcpls translates to 0-based LSP internally).
 
-```ts
-await mcp.mcpls.get_hover({ file_path: "src/main.rs", line: 10, character: 5 });
+```bash
+mcporter call mcpls.get_hover file_path=src/main.rs line=10 character=5
 ```
 
 - `rename_symbol` returns workspace text edits — it does **not** apply them.
@@ -141,52 +147,52 @@ await mcp.mcpls.get_hover({ file_path: "src/main.rs", line: 10, character: 5 });
 
 ## Top tools
 
-Fabric syntax shown; shell: `mcporter call mcpls.<tool> key=value ...`.
+Shell syntax shown; fabric legacy: `await mcp.mcpls.<tool>({...})`.
 
 ### Code Intelligence
 
-```ts
-// What type/signature is at this position?
-await mcp.mcpls.get_hover({ file_path: "src/lib.rs", line: 42, character: 8 });
-// Jump to definition
-await mcp.mcpls.get_definition({ file_path: "src/main.rs", line: 15, character: 20 });
-// Find all references across the workspace
-await mcp.mcpls.get_references({ file_path: "src/handler.rs", line: 30, character: 12 });
-// Structured outline of a file (functions, types, imports)
-await mcp.mcpls.get_document_symbols({ file_path: "src/lib.rs" });
-// Search for a symbol by name across the workspace
-await mcp.mcpls.workspace_symbol_search({ query: "process_request" });
-// Context-aware completions at a position
-await mcp.mcpls.get_completions({ file_path: "src/app.ts", line: 50, character: 4 });
+```bash
+# What type/signature is at this position?
+mcporter call mcpls.get_hover file_path=src/lib.rs line=42 character=8
+# Jump to definition
+mcporter call mcpls.get_definition file_path=src/main.rs line=15 character=20
+# Find all references across the workspace
+mcporter call mcpls.get_references file_path=src/handler.rs line=30 character=12
+# Structured outline of a file (functions, types, imports)
+mcporter call mcpls.get_document_symbols file_path=src/lib.rs
+# Search for a symbol by name across the workspace
+mcporter call mcpls.workspace_symbol_search query=process_request
+# Context-aware completions at a position
+mcporter call mcpls.get_completions file_path=src/app.ts line=50 character=4
 ```
 
 ### Diagnostics & Refactoring
 
-```ts
-// Real compiler errors and warnings (file MUST be saved to disk first)
-await mcp.mcpls.get_diagnostics({ file_path: "src/lib.rs" });
-// Quick fixes available at a position (after seeing diagnostics)
-await mcp.mcpls.get_code_actions({ file_path: "src/lib.rs", line: 42, character: 8 });
-// Workspace-wide rename (prefer over manual find-and-replace).
-// Returns text edits — does NOT apply them.
-await mcp.mcpls.rename_symbol({ file_path: "src/lib.rs", line: 20, character: 5, new_name: "new_function_name" });
-// Auto-format document
-await mcp.mcpls.format_document({ file_path: "src/lib.rs" });
+```bash
+# Real compiler errors and warnings (file MUST be saved to disk first)
+mcporter call mcpls.get_diagnostics file_path=src/lib.rs
+# Quick fixes available at a position (after seeing diagnostics)
+mcporter call mcpls.get_code_actions file_path=src/lib.rs line=42 character=8
+# Workspace-wide rename (prefer over manual find-and-replace).
+# Returns text edits — does NOT apply them.
+mcporter call mcpls.rename_symbol file_path=src/lib.rs line=20 character=5 new_name=new_function_name
+# Auto-format document
+mcporter call mcpls.format_document file_path=src/lib.rs
 ```
 
 ### Call Hierarchy
 
-```ts
-// Step 1: get call hierarchy items at a position
-const items = await mcp.mcpls.prepare_call_hierarchy({ file_path: "src/lib.rs", line: 25, character: 1 });
-// Then: get_incoming_calls — who calls it? get_outgoing_calls — what does it call?
+```bash
+# Step 1: get call hierarchy items at a position
+mcporter call mcpls.prepare_call_hierarchy file_path=src/lib.rs line=25 character=1
+# Then: get_incoming_calls — who calls it? get_outgoing_calls — what does it call?
 ```
 
 ### Server Monitoring
 
-```ts
-// Debug "no results" issues
-await mcp.mcpls.get_server_logs({});
+```bash
+# Debug "no results" issues
+mcporter call mcpls.get_server_logs
 ```
 
 ## Rust: rust-analyzer indexing delay (empty results after cold start)
