@@ -10,11 +10,6 @@ The `pi-session` tool parses pi agent session JSONL files using the pi agent SDK
 
 Sessions live in `~/.pi/agent/sessions/<project>/`.
 
-**Two doors for the past:** semantic questions ("what did we decide about
-X" — ranked search) → the **pi-recall** skill. Structural questions
-(session skeleton, timeline, role filter, tool-usage counts) → this
-skill. Lossless full-entry reads → `pi-recall expand`.
-
 **Binary:** `pi-session` (on PATH → wraps `npx tsx tools/pi-session.ts`).
 If `pi-session` is not on PATH, run `npx tsx /path/to/pi-etc/tools/pi-session.ts` with `PI_SDK_PATH` pointing to the pi SDK install.
 
@@ -29,7 +24,7 @@ If `pi-session` is not on PATH, run `npx tsx /path/to/pi-etc/tools/pi-session.ts
 pi-session --list                       # List all projects
 pi-session --list-sessions              # List all sessions with message counts
 pi-session --list-sessions -v           # Verbose: show session file paths
-pi-session --list-sessions home-e4779-projects-pi-etc    # Filter by project
+pi-session --list-sessions home-e41q    # Filter by project
 pi-session --list-subagents             # List tintinweb subagent output files
 pi-session --find 019ea19e              # Fuzzy-find by UUID or project name
 pi-session --find rust-coder            # Also finds subagent outputs
@@ -85,18 +80,18 @@ pi-session --grep-dir ~/.pi/agent/sessions/--proj-- "bug" --json | toonq --from 
 
 ## How to run
 
-`pi-session` is on PATH on labhost — `~/bin/pi-session` wrapper: bun + PI_SDK_PATH
-→ the pi SDK; the tool runs from the installed pi-etc checkout, so
-`pi update --extensions` keeps it fresh. Just call it directly:
+`pi-session` is on PATH (wraps `npx tsx tools/pi-session.ts`). Just call it directly:
 
 ```bash
 pi-session --list
 pi-session <path.jsonl> --summary
 ```
 
-If `which pi-session` returns nothing, recreate the wrapper:
-`exec bun ~/.pi/agent/git/gitverse.ru/e4779/pi-etc/tools/pi-session.ts "$@"`
-with `PI_SDK_PATH=~/.bun/install/global/node_modules/@earendil-works/pi-coding-agent`.
+If `which pi-session` returns nothing, the wrapper is missing — run the tool directly:
+```bash
+PI_SDK_PATH=/home/e41q/.nvm/versions/node/v24.13.1/lib/node_modules/@earendil-works/pi-coding-agent \
+  npx tsx /home/e41q/dev/pi-etc/tools/pi-session.ts <args>
+```
 
 ## When to use
 
