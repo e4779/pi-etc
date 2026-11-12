@@ -15,6 +15,8 @@ changes; the bytes stay on disk.
     pi-recall recall 'pi-durable chord WP8' --scope global --limit 20 > /tmp/r.md
     grep -E '^\[' /tmp/r.md | head            # ranked hits: id=, score, snippet
     sed -n '12,40p' /tmp/r.md                 # read any slice on demand
+    pi-recall outline session=<sid> | head -30    # foreign session skeleton (0.3.0+)
+    pi-recall outline session=<sid> role=user     # the jq select(role==user) idiom, encoded
 
 ## Two-step idiom: recall navigates, expand reads
 
@@ -31,6 +33,12 @@ textOffset hint it prints). Never grep session JSONL by hand.
     grep -E '^\[' /tmp/r.md | head            # pick hits by score + snippet
     pi-recall expand id=<hex> > /tmp/e.md     # full entries for the chosen ones
 
+## Recipe 1b — open a foreign session by id (the "look at session X" case)
+
+    pi-recall outline session=<sid> | head -30     # ordered skeleton: index/type/role/tool/preview
+    pi-recall outline session=<sid> role=user      # only user rows — the jq select idiom, encoded
+    pi-recall expand session=<sid> idx=<picked indices> > /tmp/e.md   # full entries at the picked points
+
 ## Recipe 2 — read a known long entry in chunks
 
     pi-recall expand session=<path|sid> idx=146 maxChars=20000 > /tmp/e.md
@@ -45,6 +53,10 @@ callable from codemode as `tools.memory_recall({...})`). This contour
 hides them from the model surface (defaultTools minus-list) — the CLI
 above is the door here: hits park to a file instead of flowing into
 context.
+- Structural questions (timeline, role filter, tool-usage counts, session
+  discovery) → the **pi-session** skill: `pi-session <file> --role user`,
+  `--timeline`, `--tool-usage` — deterministic parse views that ranked
+  search does not provide.
 - Multi-machine: `pi-memory-sync.sh` rsyncs session stores between
   machines; the engine's portable sources / fs adapters index other
   machines' archives.
