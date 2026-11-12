@@ -39,12 +39,15 @@ textOffset hint it prints). Never grep session JSONL by hand.
 
 ## Other doors
 
-- Native tools `memory_recall` / `memory_expand` / `memory_sessions` —
-  declared direct since @e4779/pi-recall 0.2.0 (also callable from codemode
-  as `tools.memory_recall({...})`). Use inline when ranked hits are enough
-  and no file workflow is needed; the CLI above always works regardless.
-- Multi-machine: `pi-memory-sync.sh` rsyncs session stores between machines;
-  the engine's portable sources / fs adapters index other machines' archives.
+The package also registers `memory_recall` / `memory_expand` /
+`memory_sessions` tools (direct in its default upstream shape, and
+callable from codemode as `tools.memory_recall({...})`). This contour
+hides them from the model surface (defaultTools minus-list) — the CLI
+above is the door here: hits park to a file instead of flowing into
+context.
+- Multi-machine: `pi-memory-sync.sh` rsyncs session stores between
+  machines; the engine's portable sources / fs adapters index other
+  machines' archives.
 
 ## Scope intuition
 
