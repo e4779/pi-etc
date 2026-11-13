@@ -71,7 +71,9 @@ type WasmInstance = {
 const DEFAULT_SUPPRESSED = ["SC1090", "SC1091", "SC2148"];
 const DEFAULT_CMD_SUPPRESSED = ["SC2154", "SC2012", "SC1083", "SC2009"];
 const SEVERITY_RANK: Record<string, number> = { style: 0, info: 1, warning: 2, error: 3 };
-const SHELL_METACHARS = /[$\"\\`|&;<>()\n]/;
+// `=` included: shellcheck flags metachar-free commands too (SC2284 on bare
+// `==` words, e.g. `echo ===SEP===`), so skipTrivial must not hide them.
+const SHELL_METACHARS = /[$\"\\`|&;<>()\n=]/;
 
 function tryReadJson(path: string): Record<string, unknown> | null {
   if (!existsSync(path)) return null;
