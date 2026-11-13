@@ -20,7 +20,7 @@ cat > "$HOME/bin/pi-session" <<EOF
 # pi-session — structural session inspector (pi-etc tools/pi-session.ts).
 # Semantic door = pi-recall; this is the structural/timeline door.
 for p in "\$PI_SDK_PATH" "$sdk"; do
-  [ -d "\$p" ] && PI_SDK_PATH="\$p" && break
+  [ -d "\$p" ] && export PI_SDK_PATH="\$p" && break
 done
 [ -d "\${PI_SDK_PATH:-}" ] || { echo "pi-session: pi SDK not found — set PI_SDK_PATH" >&2; exit 1; }
 TOOL=\$(ls "\$HOME"/.pi/agent/git/*/pi-etc/tools/pi-session.ts 2>/dev/null | head -1)
