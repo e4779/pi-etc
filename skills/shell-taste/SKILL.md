@@ -67,9 +67,8 @@ use sparingly, with the reason on the same line.
 
 ## 4. Canon (consult on demand)
 
-kn concept `~/kn/bundles/common/expressive-shell.md` · pure-sh-bible
-(dylanaraps) · Wooledge wiki (BashPitfalls, BashFAQ/105) · kiss, `/etc/rc.d/*`
-on this host.
+pure-sh-bible (dylanaraps) · Wooledge wiki (BashPitfalls, BashFAQ/105) · kiss,
+`/etc/rc.d/*` on this host.
 
 ## 5. Handbook (generated)
 

@@ -1,7 +1,6 @@
 # Drawio programmatic recipe — quick reference
 
-Full concept: ~/kn/bundles/agents/drawio-programmatic-pipeline.md (KB).
-This file is the self-contained copy for the skill.
+This file is self-contained for the skill.
 
 ## The pitfall
 
