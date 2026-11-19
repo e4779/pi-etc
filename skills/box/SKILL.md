@@ -70,8 +70,9 @@ running inside the box — check with
 5. `extensions.box_exec({ box: 'playground', cmd: 'head -2 /etc/os-release' })`
 → shows Debian 13.
 
-## Host facts (labhost)
+## Host facts (live, per machine)
 
-- distrobox 1.8.1.2, podman 5.4.2 (docker.io images are pulled via podman).
+- Versions vary per host — check live (`distrobox --version`, `podman --version`);
+  docker.io images are pulled via podman.
 - Current boxes: check live with `extensions.box_list()` /
 `distrobox list` — do not assume any specific box exists.

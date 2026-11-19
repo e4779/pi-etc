@@ -14,7 +14,7 @@ The chain has four links: **Windows Chrome instances** (debug ports),
 | server | Chrome | port | use |
 |---|---|---|---|
 | `chrome-devtools` | `chrome-debug.ps1` | 9222 | direct — default |
-| `chrome-devtools-proxy` | `chrome-debug-proxy.ps1` | 9223 | blocked foreign sites (bypass proxy <proxy-host>:8888) |
+| `chrome-devtools-proxy` | `chrome-debug-proxy.ps1` | 9223 | blocked foreign sites (bypass proxy `<proxy-host>:8888`) |
 
 Scripts live in `C:\Users\e41q\.local\bin\`. Never open RU domains through
 9223 (detection exposure) — see global `~/.pi/agent/AGENTS.md`.

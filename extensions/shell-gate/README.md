@@ -14,7 +14,7 @@ is one turn, with SC codes in hand.
 1. `bash --norc -n` — parse check, always available: unbalanced quotes,
    broken heredocs, parse errors. The "unexpected EOF" class.
 2. ShellCheck — semantic layer (word splitting, quoting, `rm -rf` on empty
-   variables). Host `shellcheck` binary first (labhost: 0.11.0 at
+   variables). Host `shellcheck` binary first (BSD hosts ship it at
    /usr/local/bin); `shellcheck-wasm` (npm dep of pi-etc) as the fallback
    for machines without the binary, executed inside the pi bun runtime.
    Skips silently when no engine is available.

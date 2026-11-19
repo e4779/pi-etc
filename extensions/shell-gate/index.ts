@@ -10,8 +10,8 @@
  * Layers (fail-open everywhere — a broken gate never wedges the agent):
  *   1. bash --norc -n parse check. Always available; catches unbalanced
  *      quotes, broken heredocs, parse errors ("unexpected EOF" class).
- *   2. ShellCheck semantics: host `shellcheck` binary first (labhost ships
- *      0.11.0 at /usr/local/bin), shellcheck-wasm (npm dep of pi-etc) as
+ *   2. ShellCheck semantics: host `shellcheck` binary first (BSD hosts
+ *      ship it at /usr/local/bin), shellcheck-wasm (npm dep of pi-etc) as
  *      the fallback for machines without the binary. Catches word
  *      splitting, unquoted variables, rm -rf on empty variables.
  *

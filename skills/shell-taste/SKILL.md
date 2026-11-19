@@ -16,11 +16,11 @@ Two tiers; pick deliberately. Host-local scripts mark `# dialect: host` on line 
 
 - **posix** (default, unmarked): POSIX Issue 7 + `local`. Runs on dash,
   FreeBSD sh, bash, busybox ash, mksh. No pipefail, no $'..'.
-- **host**: extras of the host shell. On labhost /bin/sh (probed 2026-11):
+- **host**: extras of the host shell. On FreeBSD /bin/sh (probed 2026-11):
   pipefail, $'..', `local` with dynamic scoping, `local -` (options scoped
   to the function, restored on return). bash: same set.
 
-Portability matrix (probed live on labhost 2026-11; dash column from upstream docs):
+Portability matrix (probed live 2026-11; dash column from upstream docs):
 
 | feature | POSIX Iss.7 | FreeBSD sh | bash | dash | zsh |
 |---|---|---|---|---|---|
@@ -56,7 +56,7 @@ tmp=$(mktemp -d) || die mktemp
    `shellcheck --rcfile <this-skill-dir>/.shellcheckrc script.sh`
    - portable tier: add `-s dash` — the strictest dialect, catches bashisms
      (SC2039 class "In POSIX sh, ... is undefined")
-   - host tier on labhost: `-s bash`, or let the shebang deduce
+   - host tier: `-s bash`, or let the shebang deduce
    - many scripts in one repo: drop the rc at repo root as `.shellcheckrc` —
      discovered from each script's directory upward, editors inherit it too
 3. Read every unquoted $var aloud; cannot justify it → quote it
