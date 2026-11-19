@@ -32,6 +32,11 @@ pi-etc/
 
 ## Checklist
 
+- [ ] Clone topology doctrine (ruling 2026-11-19): `~/projects/pi-etc` is
+      the CANONICAL working clone; `~/.pi/agent/git/...` is pi's install
+      target (node_modules-equivalent) — hands-off, reconciled only by
+      `pi update --extensions`. All edits go: canonical → push →
+      reconcile.
 - [ ] Branch `umbrella`; root package.json → private + workspaces; move
       `extensions/ skills/ themes/` into `packages/pi/`; keep the `pi`
       manifest and `pi-package` keyword; one `npm install` at root.
