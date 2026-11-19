@@ -1,51 +1,51 @@
 {
-  "name": "pi-etc",
-  "version": "0.1.0",
-  "description": "Personal pi coding agent extensions, skills, and themes",
-  "keywords": [
-    "pi-package",
-    "pi-extension",
-    "pi-skill"
-  ],
-  "type": "module",
-  "scripts": {
-    "lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done && sh scripts/lint-skills-data.sh",
-    "gate": "sh tools/gate.sh",
-    "postinstall": "node tools/install-hooks.mjs"
-  },
-  "pi": {
-    "extensions": [
-      "./extensions/box/index.ts",
-      "./extensions/inject-default-skills/index.ts",
-      "./extensions/lint-check/index.ts",
-      "./extensions/qwen/index.ts",
-      "./extensions/whoami/index.ts",
-      "./extensions/context-guard/index.ts",
-      "./extensions/skill-gate/index.ts",
-      "./extensions/llm/index.ts",
-      "./extensions/shell-gate/index.ts"
-    ],
-    "skills": [
-      "./skills"
-    ],
-    "themes": [
-      "./themes"
-    ]
-  },
-  "author": "e41q",
-  "license": "ISC",
-  "dependencies": {
-    "diff": "^5.2.0",
-    "nano-staged": "^1.0.2",
-    "shellcheck-wasm": "^0.3.3"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "typebox": "*"
-  },
-  "devDependencies": {
-    "@earendil-works/pi-ai": "^0.84.4",
-    "typescript": "^5.8.3"
-  }
+	"name": "pi-etc",
+	"version": "0.1.0",
+	"description": "Personal pi coding agent extensions, skills, and themes",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"pi-skill"
+	],
+	"type": "module",
+	"scripts": {
+		"lint:skills": "for f in skills/*/SKILL.md; do npx -y skills-ref validate \"$f\" || exit 1; done && sh scripts/lint-skills-data.sh",
+		"gate": "sh tools/gate.sh",
+		"postinstall": "node tools/install-hooks.mjs"
+	},
+	"pi": {
+		"extensions": [
+			"./extensions/box/index.ts",
+			"./extensions/inject-default-skills/index.ts",
+			"./extensions/lint-check/index.ts",
+			"./extensions/qwen/index.ts",
+			"./extensions/whoami/index.ts",
+			"./extensions/context-guard/index.ts",
+			"./extensions/skill-gate/index.ts",
+			"./extensions/llm/index.ts",
+			"./packages/shell-gate/index.ts"
+		],
+		"skills": [
+			"./skills"
+		],
+		"themes": [
+			"./themes"
+		]
+	},
+	"author": "e41q",
+	"license": "ISC",
+	"dependencies": {
+		"diff": "^5.2.0",
+		"nano-staged": "^1.0.2",
+		"shellcheck-wasm": "^0.3.3"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*",
+		"typebox": "*"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-ai": "^0.84.4",
+		"typescript": "^5.8.3"
+	}
 }

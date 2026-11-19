@@ -1,0 +1,18 @@
+{
+  "name": "@e4779/shell-gate",
+  "version": "0.1.0",
+  "description": "pi extension: shell command valve — bash parse check + ShellCheck before bash runs",
+  "keywords": ["pi-package", "pi-extension"],
+  "license": "ISC",
+  "author": "e4779",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "shellcheck-wasm": "^0.3.3"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
