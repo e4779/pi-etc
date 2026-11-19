@@ -1,6 +1,5 @@
 ---
 status: pending
-blocked-by: [new-repo-structure.md]
 ---
 
 # Purge dead weight at source

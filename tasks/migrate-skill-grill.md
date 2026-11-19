@@ -1,6 +1,5 @@
 ---
 status: pending
-blocked-by: [new-repo-structure.md]
 ---
 
 # Migrate skill: grill → packages/skills

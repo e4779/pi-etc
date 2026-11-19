@@ -1,6 +1,5 @@
 ---
 status: pending
-blocked-by: [new-repo-structure.md]
 ---
 
 # Migrate extension: skill-gate → packages/skill-gate

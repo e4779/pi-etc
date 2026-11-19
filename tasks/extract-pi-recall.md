@@ -1,6 +1,5 @@
 ---
 status: pending
-blocked-by: [new-repo-structure.md]
 ---
 
 # Extract pi-recall from pi-fabric → packages/pi-recall
