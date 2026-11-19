@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Deprecate pi-web-plugins — remove the dead experiment
@@ -16,11 +16,11 @@ dependencies should have been rebuilt at publish time, never committed.
 
 ## Checklist
 
-- [ ] Grep the repo for references to `pi-web-plugins` (docs, README,
+- [x] Grep the repo for references to `pi-web-plugins` (docs, README,
       scripts, gate) — remove or update each.
-- [ ] `git rm -r pi-web-plugins/` (history keeps the artifact reachable).
-- [ ] Gate green (`sh tools/gate.sh`), skills lint untouched.
-- [ ] NOTE for the umbrella refit card: the directory must not survive
+- [x] `git rm -r pi-web-plugins/` (history keeps the artifact reachable).
+- [x] Gate green (`sh tools/gate.sh`), skills lint untouched.
+- [x] NOTE for the umbrella refit card: the directory must not survive
       into `packages/` — it is excluded from the umbrella by the same
       ruling.
 
