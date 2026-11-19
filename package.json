@@ -15,10 +15,7 @@
 	},
 	"pi": {
 		"extensions": [
-			"./extensions/lint-check/index.ts",
-			"./extensions/qwen/index.ts",
 			"./packages/whoami/index.ts",
-			"./extensions/context-guard/index.ts",
 			"./packages/shell-gate/index.ts"
 		],
 		"skills": [
