@@ -1,11 +1,10 @@
 ---
-status: pending
----
+status: done
+# Delete box skill — no distrobox on FreeBSD
 
-# Migrate skill: box → packages/skills
+Verdict OVERTURNED by operator 2026-11-19: DELETE the box skill (host-vs-box doctrine) —
+there is no distrobox on FreeBSD (hlab); the skill (host-vs-box doctrine) is Linux-only dead weight.
 
-Verdict: moves to `@e4779/skills` as-is. Live via box_list/box_exec natives. Needs the distrobox host.
-
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git rm
+- [x] Root manifest cleaned (ext) / dir-wide skills glob needs no edit (skill)
+- [x] tsk check green

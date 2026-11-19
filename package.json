@@ -15,7 +15,6 @@
 	},
 	"pi": {
 		"extensions": [
-			"./extensions/box/index.ts",
 			"./extensions/lint-check/index.ts",
 			"./extensions/qwen/index.ts",
 			"./packages/whoami/index.ts",

@@ -1,11 +1,10 @@
 ---
-status: pending
----
+status: done
+# Delete box extension — no distrobox on FreeBSD
 
-# Migrate extension: box → packages/box
+Verdict OVERTURNED by operator 2026-11-19: DELETE the box extension (box_list/box_exec tools) —
+there is no distrobox on FreeBSD (hlab); the extension (box_list/box_exec tools) is Linux-only dead weight.
 
-Verdict: own package `@e4779/box`. typebox peer only.
-
-- [ ] `git mv extensions/box packages/box` + package.json + pi manifest entry
-- [ ] Deps move from root package.json to the package
-- [ ] Live probe: extension loads
+- [x] git rm
+- [x] Root manifest cleaned (ext) / dir-wide skills glob needs no edit (skill)
+- [x] tsk check green
