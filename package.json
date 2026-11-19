@@ -23,7 +23,8 @@
 			"./skills",
 			"./packages/skills/drawio",
 			"./packages/skills/mindmap",
-			"./packages/skills/skill-author"
+			"./packages/skills/skill-author",
+			"./packages/skills/gh-cli"
 		],
 		"themes": [
 			"./themes"

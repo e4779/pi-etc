@@ -1,11 +1,16 @@
 ---
-status: pending
+status: done
 ---
 
-# Migrate skill: github → packages/skills
+# Delete skill: github — MCP-transport duplicate, contour dead
 
-Verdict: moves to `@e4779/skills` as-is. MCP-natives flavor (homelab MCP); keep, README notes the dependency.
+Verdict OVERTURNED by operator 2026-11-19: DELETE.
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+Same doctrine as gh-cli through mcp.github.* natives; written for a
+contour without gh installed ("Never gh CLI (not installed)"), and no
+machine has the github MCP server configured anymore (hlab mcporter:
+chrome/mcpls/memos/zai only). gh-cli won the transport war.
+
+- [x] git rm skills/github/
+- [x] Dir-wide ./skills glob needs no root edit; package manifest never listed it
+- [x] tsk check green (pre-commit)

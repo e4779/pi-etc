@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: gh-cli → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Universal value.
+Migrated 2026-11-19. The universal GitHub door (gh CLI, pre-authenticated);
+proved live all session (every gh api call ran under this doctrine).
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] tsk check green (pre-commit)
