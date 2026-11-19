@@ -1,6 +1,6 @@
 ---
 status: pending
-blocked-by: [umbrella-refit-workspaces.md]
+blocked-by: [new-repo-structure.md]
 ---
 
 # riff — durable-agent skeleton on local llama.cpp

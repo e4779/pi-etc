@@ -1,6 +1,5 @@
 ---
 status: pending
-blocked-by: [umbrella-refit-workspaces.md]
 ---
 
 # Absorb pi-fresh into docs/ — freeze the repo
