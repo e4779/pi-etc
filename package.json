@@ -16,7 +16,8 @@
 	"pi": {
 		"extensions": [
 			"./packages/whoami/index.ts",
-			"./packages/shell-gate/index.ts"
+			"./packages/shell-gate/index.ts",
+			"./packages/co-author/index.ts"
 		],
 		"skills": [
 			"./skills"

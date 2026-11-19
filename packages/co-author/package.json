@@ -1,0 +1,15 @@
+{
+  "name": "@e4779/co-author",
+  "version": "0.1.0",
+  "description": "pi extension: auto-append Co-authored-by trailers with the model's identity",
+  "keywords": ["pi-package", "pi-extension"],
+  "license": "ISC",
+  "author": "e4779",
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
