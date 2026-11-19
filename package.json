@@ -19,7 +19,6 @@
 			"./extensions/qwen/index.ts",
 			"./packages/whoami/index.ts",
 			"./extensions/context-guard/index.ts",
-			"./extensions/llm/index.ts",
 			"./packages/shell-gate/index.ts"
 		],
 		"skills": [
