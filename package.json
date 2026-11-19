@@ -19,7 +19,7 @@
 			"./extensions/inject-default-skills/index.ts",
 			"./extensions/lint-check/index.ts",
 			"./extensions/qwen/index.ts",
-			"./extensions/whoami/index.ts",
+			"./packages/whoami/index.ts",
 			"./extensions/context-guard/index.ts",
 			"./extensions/skill-gate/index.ts",
 			"./extensions/llm/index.ts",
