@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: sobesednik → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Ruled 2026-11-19: harmless persona cards, publish.
+Ruled publishable (harmless persona cards).
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] References intact
+- [x] tsk check green (pre-commit)

@@ -12,7 +12,16 @@
 			"./drawio",
 			"./mindmap",
 			"./skill-author",
-			"./gh-cli"
+			"./gh-cli",
+			"./mcpls",
+			"./mcporter",
+			"./chrome-devtools",
+			"./grill",
+			"./layout-check",
+			"./opensource-contribution",
+			"./shell-taste",
+			"./sobesednik",
+			"./zai-mcp"
 		]
 	}
 }

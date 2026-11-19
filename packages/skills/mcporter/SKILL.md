@@ -86,6 +86,5 @@ Auth lives per-server: `env` (e.g. `GITHUB_PERSONAL_ACCESS_TOKEN`,
 | skill | servers | purpose |
 |---|---|---|
 | [chrome-devtools](../chrome-devtools/SKILL.md) | `chrome-devtools`, `chrome-devtools-proxy` | Drive a real Chrome tab (scrape, test, debug) |
-| [github](../github/SKILL.md) | `github` | Search repos/code/issues, read files, manage PRs |
 | [zai-mcp](../zai-mcp/SKILL.md) | `zai-search`, `zai-reader`, `zai-zread`, `zai-vision` | Web search, page-to-markdown, repo knowledge, image/video analysis |
 | [mcpls](../mcpls/SKILL.md) | `mcpls` (ad-hoc stdio) | Semantic code navigation via LSP |

@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: opensource-contribution → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Universal value.
+Universal value; upstream-messaging canon.
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] References intact
+- [x] tsk check green (pre-commit)

@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: shell-taste → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Universal value.
+Universal value; the strict-lint canon in lint:skills.
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] References intact
+- [x] tsk check green (pre-commit)

@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: grill → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Independent implementation (drawio-mindmap rounds), NOT a grillme copy — ruled keep; optional 'inspired by grillme-skill' line.
+Independent grillme-concept implementation; links to mindmap references restored to in-package form.
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] References intact
+- [x] tsk check green (pre-commit)

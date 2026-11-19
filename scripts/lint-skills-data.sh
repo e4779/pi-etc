@@ -165,7 +165,10 @@ check_paths() {
 
 # strict per-skill gates
 for s in $STRICT_SKILLS; do
-	f="$SKILLS/$s/SKILL.md"
+	if [ -f "$SKILLS/$s/SKILL.md" ]; then sdir="$SKILLS/$s"
+	elif [ -f "packages/skills/$s/SKILL.md" ]; then sdir="packages/skills/$s"
+	else sdir="$SKILLS/$s"; fi
+	f="$sdir/SKILL.md"
 	[ -f "$f" ] || {
 		fail "$s: SKILL.md missing"
 		continue
@@ -174,9 +177,9 @@ for s in $STRICT_SKILLS; do
 	[ "$lines" -le "$MAX_SKILL_LINES" ] ||
 		fail "$s: SKILL.md $lines lines > $MAX_SKILL_LINES"
 	check_desc "$s" "$f"
-	check_paths "$s" "$f" "$SKILLS/$s"
+	check_paths "$s" "$f" "$sdir"
 	# slug coverage: SKILL-mentioned slugs must equal emitted dom pages
-	domdir="$SKILLS/$s/references/handbook/dom"
+	domdir="$sdir/references/handbook/dom"
 	if [ -d "$domdir" ]; then
 		# generated names are recipe-controlled (<NN>-<slug>.md, no spaces)
 		dom=$(find "$domdir" -maxdepth 1 -name '*.md' -exec basename {} .md \; |

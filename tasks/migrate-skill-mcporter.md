@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: mcporter → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Coupled to mcporter CLI; keep, README notes the dependency.
+Stack-coupled (mcporter CLI); its server table lost the dead github row (skill deleted).
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] References intact
+- [x] tsk check green (pre-commit)

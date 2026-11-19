@@ -1,11 +1,11 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: chrome-devtools → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Coupled to the chrome-devtools MCP + WSL launch scripts; sanitize already genericized proxy refs.
+Sanitize already genericized proxy refs earlier; WSL launch scripts stay (generic guidance).
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + manifests (root + @e4779/skills)
+- [x] References intact
+- [x] tsk check green (pre-commit)
