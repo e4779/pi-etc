@@ -7,11 +7,11 @@ description: Always use when user asks to create, generate, draw, or design a di
 
 Generate draw.io diagrams as native `.drawio` files. Author each diagram either as **Mermaid** (concise text that the draw.io desktop CLI converts and lays out for you) or as **draw.io XML** directly. Optionally auto-layout XML-authored diagrams with **ELK**, export to PNG/SVG/PDF with the diagram XML embedded (so the exported file stays editable in draw.io), or generate a browser URL that opens the diagram directly in the draw.io editor.
 
-## Local setup (this machine)
+## Local setup
 
-- draw.io Desktop is installed at `C:\Program Files\draw.io\draw.io.exe` and is on PATH as `drawio` (new terminals only; the current session may need the full path).
-- The ZCode MCP server `drawio` (official `@drawio/mcp` tool server) is configured. Its `list_pages` / `get_page` / `set_page` tools read and edit pages of local `.drawio` files directly, including WSL files via UNC paths like `\\wsl.localhost\Ubuntu-24.04\home\e41q\...`. Prefer those MCP tools for reading/editing existing files; use this skill's CLI pipeline for authoring new diagrams and exports.
-- The user publishes diagrams by dropping raw `.drawio` files into a zola site (`static/img/`) and embedding them with the official viewer (`data-mxgraph`). Keep diagrams as plain `.drawio` XML files — no export step needed for publishing.
+- Requires the draw.io Desktop CLI on PATH as `drawio` (the desktop app bundles it).
+- Optional: the official `@drawio/mcp` server enables direct read/edit of local
+  `.drawio` pages via MCP tools; this skill CLI pipeline does not require it.
 
 ## Authoring: Mermaid or XML?
 

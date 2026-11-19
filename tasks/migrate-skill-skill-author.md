@@ -1,11 +1,13 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: skill-author → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. Universal value.
+Migrated AS-IS 2026-11-19; actualization deferred to
+skill-author-actualize card (docs grew since September; genealogy
+suspected ZCode origin).
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + @e4779/skills package created (pi manifest lists it)
+- [x] References/links intact
+- [x] tsk check green (pre-commit)

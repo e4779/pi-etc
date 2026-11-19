@@ -1,11 +1,13 @@
 ---
-status: pending
+status: done
 ---
 
 # Migrate skill: mindmap → packages/skills
 
-Verdict: moves to `@e4779/skills` as-is. References shared with drawio skill — move together, keep relative links green.
+Migrated 2026-11-19 (born 2026-09-13, extracted from grill). Shared
+references stay in-package; grill's six relative links repointed to
+../../packages/skills/mindmap/references/.
 
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+- [x] git mv + @e4779/skills package created (pi manifest lists it)
+- [x] References/links intact
+- [x] tsk check green (pre-commit)

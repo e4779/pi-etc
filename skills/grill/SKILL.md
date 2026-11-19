@@ -14,8 +14,8 @@ description: >-
 Refine a foggy idea through question rounds while building its visual map.
 The canvas (.drawio) is the source of truth; the text outline is extracted
 on finish. Mindmap theory and drawio mechanics live in the `mindmap` skill:
-[../mindmap/references/mindmap-design.md](../mindmap/references/mindmap-design.md)
-and [../mindmap/references/drawio-recipe.md](../mindmap/references/drawio-recipe.md).
+[../../packages/skills/mindmap/references/mindmap-design.md](../../packages/skills/mindmap/references/mindmap-design.md)
+and [../../packages/skills/mindmap/references/drawio-recipe.md](../../packages/skills/mindmap/references/drawio-recipe.md).
 
 ## Session start
 
@@ -49,7 +49,7 @@ to. Never balloon rounds rephrasing an ungrillable question.
 
 ## Layout discipline
 
-Follow [../mindmap/references/mindmap-design.md](../mindmap/references/mindmap-design.md). Hard
+Follow [../../packages/skills/mindmap/references/mindmap-design.md](../../packages/skills/mindmap/references/mindmap-design.md). Hard
 rules: 1–3 keywords per node (never sentences), ≤9 first-level branches,
 depth ≤4, one color per first-level branch, curved edges, related branches
 adjacent. Radial "sun" for exploration; right-flowing logic tree when

@@ -20,7 +20,10 @@
 			"./packages/co-author/index.ts"
 		],
 		"skills": [
-			"./skills"
+			"./skills",
+			"./packages/skills/drawio",
+			"./packages/skills/mindmap",
+			"./packages/skills/skill-author"
 		],
 		"themes": [
 			"./themes"
