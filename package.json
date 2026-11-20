@@ -13,29 +13,6 @@
 		"gate": "sh tools/gate.sh",
 		"postinstall": "node tools/install-hooks.mjs"
 	},
-	"pi": {
-		"extensions": [
-			"./packages/whoami/index.ts",
-			"./packages/shell-gate/index.ts",
-			"./packages/co-author/index.ts"
-		],
-		"skills": [
-			"./packages/skills/drawio",
-			"./packages/skills/mindmap",
-			"./packages/skills/skill-author",
-			"./packages/skills/gh-cli",
-			"./packages/skills/mcpls",
-			"./packages/skills/mcporter",
-			"./packages/skills/chrome-devtools",
-			"./packages/skills/grill",
-			"./packages/skills/layout-check",
-			"./packages/skills/opensource-contribution",
-			"./packages/skills/shell-taste",
-			"./packages/skills/sobesednik",
-			"./packages/skills/zai-mcp",
-			"./packages/pi-recall/skills/pi-recall"
-		]
-	},
 	"author": "e41q",
 	"license": "ISC",
 	"dependencies": {
