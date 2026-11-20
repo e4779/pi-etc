@@ -1,15 +1,23 @@
 {
-  "name": "@e4779/whoami",
-  "version": "0.1.0",
-  "description": "pi extension: stable model identity across sessions and model switches",
-  "keywords": ["pi-package", "pi-extension"],
-  "license": "ISC",
-  "author": "e4779",
-  "type": "module",
-  "pi": {
-    "extensions": ["./index.ts"]
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
-  }
+	"name": "@e4779/whoami",
+	"version": "0.1.0",
+	"description": "pi extension: stable model identity across sessions and model switches",
+	"keywords": [
+		"pi-package",
+		"pi-extension"
+	],
+	"license": "ISC",
+	"author": "e4779",
+	"type": "module",
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"publishConfig": {
+		"access": "public"
+	}
 }

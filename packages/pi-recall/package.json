@@ -25,5 +25,8 @@
 	"peerDependencies": {
 		"@earendil-works/pi-coding-agent": "*",
 		"typebox": "*"
+	},
+	"publishConfig": {
+		"access": "public"
 	}
 }

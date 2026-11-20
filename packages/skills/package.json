@@ -23,5 +23,8 @@
 			"./sobesednik",
 			"./zai-mcp"
 		]
+	},
+	"publishConfig": {
+		"access": "public"
 	}
 }
