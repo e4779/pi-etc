@@ -1,6 +1,6 @@
 {
 	"name": "@e4779/skills",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Agent-agnostic skill pack (pi manifest inside; plain markdown, other agents can read it too)",
 	"keywords": [
 		"pi-package"
