@@ -34,9 +34,6 @@
 			"./packages/skills/sobesednik",
 			"./packages/skills/zai-mcp",
 			"./packages/pi-recall/skills/pi-recall"
-		],
-		"themes": [
-			"./themes"
 		]
 	},
 	"author": "e41q",
@@ -54,5 +51,10 @@
 	"devDependencies": {
 		"@earendil-works/pi-ai": "^0.84.4",
 		"typescript": "^5.8.3"
-	}
+	},
+	"private": true,
+	"workspaces": [
+		"packages/*",
+		"apps/*"
+	]
 }
