@@ -28,5 +28,9 @@
 	},
 	"publishConfig": {
 		"access": "public"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/e4779/pi-etc.git"
 	}
 }
