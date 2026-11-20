@@ -1,11 +1,13 @@
 ---
-status: pending
+status: done
 ---
 
-# Migrate skill: fabric-orchestration → packages/skills
+# Delete skill: fabric-orchestration — fabric contour retired
 
-Verdict: moves to `@e4779/skills` as-is. Ruled 2026-11-19: plain skill, keep as-is (fabric-contour delegation patterns).
-
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+Surviving-value patterns split into two cards:
+orchestration-nuggets-to-system-agents (distill LATER: non-blocking
+agent calls, verifier contracts, decomposition shapes) and
+fabric-orchestration-residue-sweep (blocked by it).
+- [x] git rm; skills/ dir emptied, root "./skills" glob removed
+- [x] Cross-references cleaned at deletion time
+- [x] tsk check green (pre-commit)

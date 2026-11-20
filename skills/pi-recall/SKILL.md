@@ -54,7 +54,7 @@ hides them from the model surface (defaultTools minus-list) — the CLI
 above is the door here: hits park to a file instead of flowing into
 context.
 - Structural questions (timeline, role filter, tool-usage counts, session
-  discovery) → the **pi-session** skill: `pi-session <file> --role user`,
+  discovery) → `pi-recall outline session=<sid> role=user` (same engine),
   `--timeline`, `--tool-usage` — deterministic parse views that ranked
   search does not provide.
 - Multi-machine: `pi-memory-sync.sh` rsyncs session stores between

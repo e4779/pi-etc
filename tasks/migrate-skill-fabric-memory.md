@@ -1,11 +1,13 @@
 ---
-status: pending
+status: done
 ---
 
-# Migrate skill: fabric-memory → packages/skills
+# Delete skill: fabric-memory — fabric contour retired
 
-Verdict: moves to `@e4779/skills` as-is. Ruled 2026-11-19: plain skill, keep as-is (documents fabric-contour natives).
-
-- [ ] `git mv skills/{name} packages/skills/{name}` + skills-package manifest covers it
-- [ ] Relative links (../mindmap etc.) stay green
-- [ ] Gate green
+Operator: "я больше фабрикой не пользуюсь". Documented fabric
+natives (memory.recall/expand/walk) absent on vanilla pi. Its
+recipes served one last time today: the skill-gate genealogy dig
+(source-qualified recall over the shared stores).
+- [x] git rm; skills/ dir emptied, root "./skills" glob removed
+- [x] Cross-references cleaned at deletion time
+- [x] tsk check green (pre-commit)

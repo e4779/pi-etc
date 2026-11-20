@@ -20,7 +20,6 @@
 			"./packages/co-author/index.ts"
 		],
 		"skills": [
-			"./skills",
 			"./packages/skills/drawio",
 			"./packages/skills/mindmap",
 			"./packages/skills/skill-author",
