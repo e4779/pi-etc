@@ -1,5 +1,6 @@
 ---
 status: pending
+blocked-by: [migrate-skill-fabric-orchestration.md]
 ---
 
 # Orchestration nuggets → system AGENTS.md
