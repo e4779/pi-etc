@@ -1,23 +1,29 @@
 {
-  "name": "@e4779/pi-recall",
-  "version": "0.4.0",
-  "description": "Cross-session memory over pi session transcripts: BM25 recall, lossless expand, outline, catalog — a wrapper over the fabric memory primitives for machines that run vanilla pi",
-  "keywords": ["pi-package"],
-  "license": "MIT",
-  "author": "e4779",
-  "type": "module",
-  "bin": {
-    "pi-recall": "./bin/pi-recall"
-  },
-  "pi": {
-    "extensions": ["./extensions/memory.ts"],
-    "skills": ["./skills/pi-recall"]
-  },
-  "dependencies": {
-    "@e4779/pi-fabric": "^0.132.6-fork.35"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "typebox": "*"
-  }
+	"name": "@e4779/pi-recall",
+	"version": "0.4.0",
+	"description": "Cross-session memory over pi session transcripts: BM25 recall, lossless expand, outline, catalog \u2014 a wrapper over the fabric memory primitives for machines that run vanilla pi",
+	"keywords": [
+		"pi-package"
+	],
+	"license": "MIT",
+	"author": "e4779",
+	"type": "module",
+	"bin": {
+		"pi-recall": "./bin/pi-recall"
+	},
+	"pi": {
+		"extensions": [
+			"./extensions/memory.ts"
+		],
+		"skills": [
+			"./skills/pi-recall"
+		]
+	},
+	"dependencies": {
+		"@e4779/pi-fabric": "0.138.1-fork.1"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"typebox": "*"
+	}
 }
