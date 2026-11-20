@@ -1,0 +1,57 @@
+name: Publish
+
+# OIDC trusted publishing (no tokens): each package that npm lacks is
+# packed from the workspace and published with provenance. Register each
+# package name as a Trusted Publisher on npm (repo e4779/pi-etc, workflow
+# publish.yml) before the first real publish.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build, check and pack, but do not publish
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install
+        run: npm install --no-fund --no-audit
+      - name: Pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          for w in skills shell-gate whoami co-author pi-recall; do
+            npm pack --workspace "packages/$w" --pack-destination "$RUNNER_TEMP/pack"
+          done
+      - name: Publish
+        env:
+          DRY_RUN: ${{ inputs.dry_run != false }}
+        run: |
+          npm install --global npm@latest
+          cd "$RUNNER_TEMP"
+          for tarball in ./pack/*.tgz; do
+            spec=$(tar -xOzf "$tarball" package/package.json | node -p "const p = JSON.parse(require('fs').readFileSync(0, 'utf8')); p.name + '@' + p.version")
+            echo "== $spec"
+            if npm view "$spec" version >/dev/null 2>&1; then
+              echo "$spec is already on npm"
+            elif [ "$DRY_RUN" = true ]; then
+              echo "Dry run: not publishing $spec"
+            else
+              npm publish "$tarball" --access public --provenance
+            fi
+          done
