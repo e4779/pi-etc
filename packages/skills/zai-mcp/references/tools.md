@@ -1,3 +1,6 @@
+> **Transport note.** Scenarios below use fabric-native syntax (mcp.<server>.<tool>()).
+> On vanilla contours the same calls map 1:1 to: mcporter call <server> <tool> --args '<same JSON>'.
+
 # Z.AI MCP — Full Tool Reference
 
 > **Read on demand.** Every tool across the four servers, with full signatures.
