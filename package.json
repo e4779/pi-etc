@@ -9,7 +9,7 @@
 	],
 	"type": "module",
 	"scripts": {
-		"lint:skills": "for f in skills/*/SKILL.md packages/skills/*/SKILL.md; do [ -e \"$f\" ] && npx -y skills-ref validate \"$f\" || exit 1; done && sh scripts/lint-skills-data.sh",
+		"lint:skills": "for f in packages/skills/*/SKILL.md packages/*/skills/*/SKILL.md; do [ -e \"$f\" ] && npx -y skills-ref validate \"$f\" || exit 1; done && sh scripts/lint-skills-data.sh",
 		"gate": "sh tools/gate.sh",
 		"postinstall": "node tools/install-hooks.mjs"
 	},
@@ -32,7 +32,8 @@
 			"./packages/skills/opensource-contribution",
 			"./packages/skills/shell-taste",
 			"./packages/skills/sobesednik",
-			"./packages/skills/zai-mcp"
+			"./packages/skills/zai-mcp",
+			"./packages/pi-recall/skills/pi-recall"
 		],
 		"themes": [
 			"./themes"
